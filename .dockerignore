@@ -1,0 +1,7 @@
+# Only what docker/Dockerfile copies is sent to the build.
+*
+!backend/target/myphotodiary-backend-*.jar
+!frontend/dist/
+!docker/Caddyfile
+!docker/entrypoint.sh
+!backend/src/deb/scripts/

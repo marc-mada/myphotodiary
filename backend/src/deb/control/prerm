@@ -1,0 +1,12 @@
+#!/bin/sh
+# Stops the running service before its unit file is removed/upgraded - a
+# unit that's been unpacked-over or removed out from under a running
+# process is exactly the kind of thing this avoids.
+set -e
+
+if [ "$1" = "remove" ] || [ "$1" = "upgrade" ] || [ "$1" = "deconfigure" ]; then
+	systemctl stop myphotodiary-backend >/dev/null 2>&1 || true
+	systemctl stop myphotodiary-backend-backup.timer >/dev/null 2>&1 || true
+fi
+
+exit 0

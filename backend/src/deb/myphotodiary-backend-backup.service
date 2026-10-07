@@ -1,0 +1,17 @@
+[Unit]
+Description=myPhotoDiary backend - original photos/videos backup
+# Best-effort ordering hint only - the real safety net is backup-images.sh's
+# own mountpoint check (see that script's own comment), which correctly
+# refuses to proceed whether or not this unit happens to race the NAS mount
+# at boot. Once the NAS is set up as a real systemd .mount unit or an
+# /etc/fstab entry with _netdev, add "RequiresMountsFor=<mount point>" here
+# for stricter ordering - not possible to wire up sight-unseen before the
+# NAS itself exists (see the Installation Guide, §9.1).
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=myphotodiary
+Group=myphotodiary
+EnvironmentFile=-/etc/myphotodiary-backend/myphotodiary-backend.env
+ExecStart=/usr/share/myphotodiary-backend/scripts/backup-images.sh

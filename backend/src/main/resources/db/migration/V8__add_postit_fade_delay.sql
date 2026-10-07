@@ -1,0 +1,18 @@
+-- Desktop post-it auto-fade delay - a new per-user preference, not a port:
+-- legacy's own desktop postit has no configurable delay at all (idx.css's
+-- div.postit is opacity:0 by default, revealed only on hover, with a fixed
+-- 3s transition-delay before fading back out - no admin.jsp config field
+-- for it, unlike slideShowInterval/defaultLat/defaultLng which all trace
+-- back to a real UserConfiguration field). This backend's own desktop
+-- post-it (PostIt.jsx) has instead always been visible with no fade at
+-- all until now - explicit ask, 28/08/2026: fade out after a delay,
+-- configurable from the Admin screen's Config panel like the other
+-- per-user display-timing settings already are.
+--
+-- Same 8-second-ish "stays legible a few seconds, then gets out of the
+-- way" intent as mobile's own already-hardcoded MobilePostIt auto-hide
+-- (10000ms, midx.js's own postit.show()) - not identical on purpose
+-- (mobile's is a hard show/hide toggle with no admin config of its own,
+-- desktop's is a real per-user setting with a smooth fade), just similar
+-- in spirit as a sensible default.
+ALTER TABLE app_user ADD COLUMN postit_fade_delay INTEGER DEFAULT 8 NOT NULL;

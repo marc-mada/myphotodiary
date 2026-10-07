@@ -1,0 +1,32 @@
+[Unit]
+Description=myPhotoDiary backend
+After=network.target
+
+[Service]
+Type=simple
+User=myphotodiary
+Group=myphotodiary
+# The "-" prefix means "don't fail to start if this file is somehow missing" -
+# it won't be (the package installs it as a conffile), but this matches
+# systemd's own documented idiom for an EnvironmentFile a unit depends on.
+# Every server-specific value (MPD_DB_PATH, MPD_STORAGE_ROOT,
+# MPD_STAGING_ROOT, MPD_VIDEO_TOKEN_SECRET, SERVER_PORT) lives there, not
+# here - see myphotodiary-backend.env's own comments: real server paths
+# never belong in a tracked file.
+EnvironmentFile=-/etc/myphotodiary-backend/myphotodiary-backend.env
+# /usr/bin/java (update-alternatives), not a hardcoded JDK path - a fixed
+# path like /usr/lib/jvm/java-21-openjdk-<arch>/bin/java would need the
+# architecture baked in, and isn't guaranteed to exist at all on every
+# Debian/Ubuntu install. The real trade-off, found live (04/09/2026,
+# production cutover): a server with more than one JDK installed can have
+# an *older* one set as the active alternative, in which case this dies
+# almost instantly on every start (systemd only ever reports the resulting
+# death-loop as "Start request repeated too quickly", no indication why) -
+# postinst checks /usr/bin/java's own version right after install and
+# warns clearly if it's not 21+, rather than leaving this to be diagnosed
+# cold from a bare systemd failure.
+ExecStart=/usr/bin/java -jar /usr/share/myphotodiary-backend/myphotodiary-backend.jar
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,2738 @@
+/* Deliberately plain otherwise: the Admin screen replaces jTable's default
+   "metro dark" theme, which was that library's own skin, not app branding
+   worth preserving (Design.md decision #8) - unlike the gallery/upload screens, which
+   do carry real visual identity to port closely when we get there.
+   The page background is the one exception kept from the legacy app: every
+   screen (idx.css - header, photo-frame, panels) uses the same near-black
+   rgb(25,25,25) behind light-gray text - the one piece of visual identity
+   that's app-wide rather than tied to a widget skin, so it's kept here too. */
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	font-family: system-ui, sans-serif;
+	background: rgb(25, 25, 25);
+	/* Matches idx.css's body text color - light gray was chosen there to read
+	   against this same dark background, so it's kept as a pair. Card-like
+	   surfaces below (login form, modal, table) stay white/dark-on-white and
+	   override this explicitly - only the bare page background is shared. */
+	color: rgb(220, 220, 220);
+}
+
+/* Session-cookie auth (18/09/2026) - the brief window while AuthProvider's
+   own initial /api/me check is in flight, before either the login form or
+   the real app renders. Inherits body's own dark background/light text -
+   just centers itself full-viewport. */
+.app-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100vh;
+}
+
+/*************************************
+** Scrollbars (03/09/2026, explicit ask: "darker, coherent with the Desktop
+** UI general colors: grey, dark greys and black... a silver effect";
+** revised same day, explicit ask: a plain vertical gradient, rgb(100,100,100)
+** at the bottom to rgb(150,150,150) at the top - replaces the original
+** brushed-metal/bevel-across-the-width look with this simpler two-stop one)
+**
+** Global, not enumerated per scrollable container (.gallery-sidebar,
+** .directory-tree, #rsidebar, .app-screen, the Admin table, every popup...
+** there are too many, and any new one added later would silently miss out)
+** - the default OS scrollbar (light grey on white in most browsers/themes)
+** stood out sharply against this app's near-black surfaces everywhere it
+** appeared. Two separate mechanisms, deliberately both present rather than
+** either/or: `scrollbar-color`/`scrollbar-width` (the standard, Firefox and
+** Chromium both honor it, but it's a flat single thumb color - no gradient
+** possible) sets a sane baseline everywhere, its own flat color the
+** midpoint between the gradient's two stops; the `::-webkit-scrollbar-*`
+** pseudo-elements (Chromium/Safari only, ignored elsewhere) layer the
+** actual vertical gradient on top via a gradient thumb - the two don't
+** conflict, a browser just uses whichever it understands.
+*************************************/
+* {
+	scrollbar-width: thin;
+	scrollbar-color: rgb(125, 125, 125) rgb(20, 20, 20);
+}
+
+::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+
+::-webkit-scrollbar-track {
+	background: rgb(20, 20, 20);
+}
+
+::-webkit-scrollbar-corner {
+	background: rgb(20, 20, 20);
+}
+
+/* `to top` reads bottom-to-top in CSS gradient syntax (the first color
+   sits at the gradient line's start - the bottom edge here - the last at
+   its end): rgb(100,100,100) at the bottom, rgb(150,150,150) at the top,
+   exactly as asked, not the reverse. */
+::-webkit-scrollbar-thumb {
+	background: linear-gradient(to top, rgb(100, 100, 100), rgb(150, 150, 150));
+	border-radius: 6px;
+	border: 2px solid rgb(20, 20, 20);
+}
+
+/* Hover/active brighten both stops by the same amount, keeping the bottom-
+   darker/top-lighter relationship intact - real feedback on interaction,
+   not just decoration, same spirit as the rest of this app's button hover
+   states. */
+::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(to top, rgb(120, 120, 120), rgb(170, 170, 170));
+}
+
+::-webkit-scrollbar-thumb:active {
+	background: linear-gradient(to top, rgb(140, 140, 140), rgb(190, 190, 190));
+}
+
+/* The sign-in *screen* (03/09/2026, explicit ask, corrected same day - an
+   earlier pass had wrongly put the banner and the lighter background
+   inside `.login-form` itself rather than around it): a `.screen-nav` bar
+   (same class/markup as the authenticated Gallery/Search/Admin screens'
+   own top bar and ShareScreen's reuse of it - "same position as for the
+   Gallery screen", explicit ask) holding just the centered banner, above
+   a body that centers the (still-black) login card on a slightly lighter
+   screen background than the app-wide rgb(25,25,25) elsewhere. */
+.login-screen {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background: #242424;
+}
+
+.login-screen-body {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.login-form {
+	/* Matches legacy #loginPopup exactly (idx.css): black panel, light-gray
+	   text, same shadow color - the one screen where legacy used black
+	   rather than the app-wide rgb(25,25,25), so it's kept distinct here
+	   too (kept black on explicit request, 03/09/2026 - only the *screen*
+	   background around this card lightened, not the card itself). */
+	max-width: 320px;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	background: black;
+	color: rgb(220, 220, 220);
+	padding: 2rem;
+	border-radius: 8px;
+	box-shadow: -3px 6px 10px #111;
+}
+
+.login-form .form-error {
+	color: #f87171;
+}
+
+.login-form label,
+.modal label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.9rem;
+}
+
+.login-form input,
+.modal input,
+.modal select {
+	padding: 0.5rem;
+	font-size: 1rem;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+}
+
+.hint {
+	font-weight: normal;
+	color: #666;
+	font-size: 0.8rem;
+}
+
+.form-error {
+	color: #b91c1c;
+	margin: 0;
+}
+
+/* "Link copied!" confirmation (02/09/2026, GalleryScreen's image-link/
+   sequence-link buttons) - a neutral/positive color, not .form-error's own
+   red, since this isn't an error - navigator.clipboard.writeText succeeding
+   still needs *some* visible signal, unlike a native OS copy affordance. */
+.copy-feedback {
+	color: rgb(150, 220, 150);
+	margin: 0;
+}
+
+/* "Fair grey" (explicit ask, 28/08/2026 - was plain white before) - every
+   plain button/tab defaults to this now via the bare `button` rule below,
+   rather than each one needing its own override; still light enough that
+   the existing dark #1a1a1a text stays comfortably readable on it. Scoped
+   to actual buttons/tabs only - white *panel* surfaces (ConfigPanel,
+   IndexManagementPanel, the Admin modal, tables) are a separate, deliberate
+   white-surface convention (Design.md decision #8) untouched by this. */
+button {
+	padding: 0.4rem 0.9rem;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	background: rgb(225, 225, 225);
+	color: #1a1a1a;
+	cursor: pointer;
+}
+
+/* Bold button text (03/09/2026, explicit ask, Desktop UI only) - scoped to
+   the two desktop root wrappers (.app-shell: the authenticated Gallery/
+   Search/Admin screens and ShareScreen, all of which mount inside it;
+   .login-form: the one desktop screen that isn't) rather than added to the
+   bare `button` rule above, which mobile's own button contexts
+   (.mobile-home-header/.mobile-page-header/.mobile-home-footer/
+   .mobile-side-panel button, MobileShareScreen) would otherwise also
+   inherit - "Desktop UI" was explicit, and mobile wasn't asked for. */
+.app-shell button,
+.login-form button {
+	font-weight: bold;
+}
+
+/* Hover text color, every button (01/09/2026, explicit ask) - back to the
+   button's own default the instant the cursor leaves (plain :hover,
+   nothing to revert by hand). `.sign-out-button:hover` below overrides
+   this one exception with red instead - two classes beats one
+   class+element in specificity, so it wins regardless of source order.
+   #1d4ed8, not the originally-requested #7ec8ff (explicit follow-up ask,
+   same day, after being shown the two side by side) - that lighter blue
+   measured at only ~1.4:1 contrast against this button's own
+   rgb(225,225,225) background, well under WCAG AA's 3:1 floor for UI
+   text, confirmed readable in practice only via its hue contrast, not its
+   lightness. This darker blue (Tailwind's own blue-700) measures ~5.1:1 -
+   comfortably AA-compliant - while still reading clearly as blue, not
+   navy/near-black. */
+button:hover {
+	color: #1d4ed8;
+}
+
+/* Sign in (LoginForm) / Sign out (App.jsx's shared nav-account, top-right
+   on every screen) - a black power symbol, background now matches the
+   same fair-grey `button` default above rather than a dedicated pure
+   white (superseding that earlier explicit choice, 28/08/2026 - for
+   consistency with every other button/tab now sharing this one color). */
+.power-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	background: rgb(225, 225, 225);
+	color: black;
+}
+
+/* Sign-Out specifically, not Sign-In - both share .power-button, so this
+   needs its own class (App.jsx's nav button only) to differ from the
+   general blue hover above. "Bright red" wasn't given an exact value
+   (unlike the blue above) - reusing #b91c1c, this app's own existing
+   red-on-a-light-surface color (.form-error/button.danger), not the
+   darker-surface #f87171 used on .login-form's own black background -
+   the light grey `button` background here is the same surface
+   .form-error/button.danger already read against, not that one. */
+.sign-out-button:hover {
+	color: #b91c1c;
+}
+
+.power-icon {
+	width: 1em;
+	height: 1em;
+	flex-shrink: 0;
+}
+
+.user-admin {
+	max-width: 900px;
+	margin: 2rem auto;
+	padding: 0 1rem;
+}
+
+/* True tabs (explicit ask, 28/08/2026) - a thin line along the whole bar's
+   own bottom edge, same grey as the active tab's own background, so the
+   active tab reads as "attached" to the line rather than floating above
+   an unrelated separator. Same treatment as .screen-nav below - shared
+   `.tab-button` class, just a wider fixed width here to fit "Index
+   management"/"Gérer l'indexation", the longest label in either language. */
+/* `align-items: center` + `padding-bottom: 0.75rem` (was `flex-start`, no
+   padding) - matches .screen-nav's own box model exactly, so the shared
+   `.tab-button` rule's negative bottom margin (see its own comment) lands
+   correctly in both places without a per-bar special case. */
+.user-admin-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: 1rem;
+	padding-bottom: 0.75rem;
+	border-bottom: 2px solid rgb(90, 90, 90);
+}
+
+.user-admin-toolbar .tab-button {
+	width: 190px;
+}
+
+/* The four tab buttons (Users/Configure/Index management/Tags) - same
+   medium-grey-when-selected treatment as the top-level .screen-nav tabs
+   (explicit ask: no more blue for a "selected" state anywhere). */
+.user-admin-toolbar button.active {
+	background: rgb(90, 90, 90);
+	color: white;
+	border-color: rgb(90, 90, 90);
+}
+
+/* The "Config" pane from legacy admin.jsp (ConfigPanel.jsx) - a simple
+   toggled inline form, same as legacy's own openConfig()/closeConfig(),
+   just following this screen's white-surface convention (Design.md decision #8's
+   note that the admin screen's own look, unlike the gallery's, isn't part
+   of the app's visual identity to preserve) rather than legacy's dark-hive
+   jquery-ui admin theme. */
+.config-panel-form {
+	display: flex;
+	align-items: flex-end;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	background: white;
+	color: #1a1a1a;
+	padding: 0.75rem 1rem;
+	border-radius: 6px;
+	margin-top: 0.5rem;
+}
+
+.config-panel-form label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.85rem;
+}
+
+.config-panel-form input {
+	width: 8rem;
+}
+
+/* App-wide settings (28/08/2026, video support) - a second, visually
+   distinct .config-panel-form box (own white surface, own margin-top
+   already applied generically above) so it doesn't read as one more field
+   in the caller's own personal-settings form just above it. */
+.app-settings-form {
+	margin-top: 1rem;
+}
+
+/* Server version line right below the App-wide settings box (26/09/2026,
+   explicit ask) - plain metadata text on the admin screen's dark ground,
+   same muted grey as other metadata lines (.image-capture-date). */
+.app-version {
+	margin: 0.75rem 0 0;
+	font-size: 0.85rem;
+	color: rgb(150, 150, 150);
+}
+
+.config-panel-form h4 {
+	width: 100%;
+	margin: 0 0 0.25rem;
+}
+
+/* Index management pane (IndexManagementPanel.jsx) - legacy admin.jsp's
+   dirIndexPane/batchPublish, same white-surface convention as ConfigPanel.
+   Restructured 28/08/2026 (explicit ask) into three stacked white boxes -
+   directory table, New Directory form, Batch Publish form - with a literal
+   black spacer between each: the wrapper's own black background is what
+   shows through the flex gap, not just the page's near-black default. */
+.index-management-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	background: black;
+	margin-top: 0.5rem;
+	max-width: 900px;
+}
+
+.index-management-box {
+	background: white;
+	color: #1a1a1a;
+	padding: 0.75rem 1rem;
+	border-radius: 6px;
+}
+
+.index-management-box .directory-create-form input {
+	flex: 1;
+}
+
+.batch-publish-form {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+/* "Use the folders' dates" (06/10/2026) - its own line under the inputs. */
+.batch-publish-folder-dates {
+	flex-basis: 100%;
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-size: 0.85rem;
+}
+
+.batch-publish-form input {
+	flex: 1;
+}
+
+.index-management-table-wrap {
+	max-height: 40vh;
+	overflow-y: auto;
+	margin-bottom: 0.75rem;
+}
+
+.index-management-table {
+	width: 100%;
+}
+
+.index-management-table th,
+.index-management-table td {
+	text-align: left;
+	padding: 0.35rem 0.5rem;
+	border-bottom: 1px solid #e5e5e5;
+	font-size: 0.85rem;
+}
+
+.index-management-table td:nth-child(n + 3) {
+	text-align: center;
+}
+
+/* Backup panel (18/09/2026) - reuses .index-management-panel/-box for the
+   same two-white-boxes-on-black layout as Index management, just its own
+   status-line colors. */
+.backup-status-ok {
+	color: #15803d;
+}
+
+.backup-status-warning {
+	color: #b91c1c;
+}
+
+/* Spacer between "New user" and the table below it (explicit ask,
+   28/08/2026) - the button used to sit right against the table with no
+   breathing room. */
+.users-panel > button:first-child {
+	margin-bottom: 20px;
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+	background: white;
+	color: #1a1a1a;
+}
+
+.user-table th,
+.user-table td,
+.inner-table th,
+.inner-table td {
+	text-align: left;
+	padding: 0.5rem 0.75rem;
+	border-bottom: 1px solid #e5e5e5;
+}
+
+/* Header row always visible while a long table scrolls (04/10/2026,
+   explicit ask) - Admin's Users table (scrolls with .app-screen, so the
+   header sticks just under the tabs) and Index management's directory
+   table (scrolls inside .index-management-table-wrap). `> thead` on
+   purpose: the role sub-table that opens inside a user's row keeps a
+   normal header. A sticky cell needs its own background so rows don't
+   show through it, and with `border-collapse: collapse` its border-bottom
+   doesn't travel with it - an inset shadow draws that line instead. */
+.user-table > thead th,
+.index-management-table > thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: white;
+	box-shadow: inset 0 -1px 0 #cfcfcf;
+}
+
+.row-actions {
+	display: flex;
+	gap: 0.4rem;
+}
+
+.role-assignments-row td {
+	background: #fafafa;
+	padding: 1rem;
+}
+
+.role-assignments-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 0.75rem;
+}
+
+.inner-table {
+	margin-bottom: 0.75rem;
+}
+
+.role-assignment-form {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.modal-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.4);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.modal {
+	background: white;
+	color: #1a1a1a;
+	padding: 1.5rem;
+	border-radius: 8px;
+	width: 360px;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.5rem;
+}
+
+/*************************************
+** Screen nav (new - no legacy equivalent, see App.jsx)
+*************************************/
+/* The app shell owns the viewport-height constraint, not each individual
+   screen - a screen can't know the nav bar's own height to subtract it
+   (that was the bug: .gallery-screen{height:100vh} overflowed the viewport
+   by exactly the nav's height, since it's a sibling above it, not a parent).
+   .app-screen gets `flex:1` instead, and passes an exact, correct amount of
+   space down to whichever screen is mounted inside it. */
+.app-shell {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+}
+
+.app-screen {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	overflow-y: auto;
+}
+
+/* True tabs (explicit ask, 28/08/2026): a thin line spans the bar's own
+   full width at the bottom, same grey as the active tab's background, so
+   the active tab reads as "attached" to that line rather than floating
+   above an unrelated separator - not just an underline sized to the
+   active tab itself. */
+.screen-nav {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.75rem 1rem;
+	background: black;
+	flex-shrink: 0;
+	border-bottom: 2px solid rgb(90, 90, 90);
+	/* Explicit height (02/09/2026), matching what the authenticated nav's
+	   own real content (TabBar + LanguageSwitcher/Sign-out, ~55.8px
+	   measured) already produces without ever having to set one - no effect
+	   there, min-height never overrides a taller natural height. ShareScreen/
+	   MobileShareScreen reuse this same bar with only the banner img inside
+	   (position:absolute, so it contributes nothing to flex sizing) and
+	   nothing else - without this, the bar collapses to its own padding
+	   alone (~26px), shorter than .nav-logo's own 32px height, so the
+	   banner poked out past both the bar's top and bottom edges ("the
+	   banner image has no clearance", explicit ask) instead of sitting
+	   inside it like it does everywhere else. */
+	min-height: 56px;
+}
+
+.screen-nav button.active {
+	background: rgb(90, 90, 90);
+	color: white;
+	border-color: rgb(90, 90, 90);
+}
+
+/* Equal-width tabs (Gallery/Search/Admin, and the same class reused for
+   the Admin screen's own Users/Configure/Index management/Tags bar, see
+   .user-admin-toolbar) - a fixed width rather than flex-grow, so they read
+   as a deliberate row of tabs rather than buttons stretched to fill
+   whatever space happens to be free next to the centered logo/account
+   controls. Wide enough for "Administration"/"Rechercher", the longest
+   labels in either supported language.
+   - `align-self: stretch` + a negative bottom margin equal to the parent
+     bar's own bottom padding (explicit ask, 28/08/2026): without this, the
+     tab sits centered within the bar with visible black/page-background
+     showing between its own bottom edge and the bar's bottom line - this
+     pulls it down to actually touch that line, so the active tab reads as
+     attached to it rather than floating above a gap. Only the tabs move;
+     the bar's own padding is untouched, so the logo/account controls
+     elsewhere in the same bar (App.jsx) keep their existing centered
+     position exactly as before.
+   - `border-radius: 12px 12px 0 0` (03/09/2026, explicit ask - bumped
+     from the original 4px, top corners only) - rounded top, square
+     bottom is deliberate: the active tab's bottom edge still needs to
+     read as "attached" to the bar's own bottom line (the `margin-bottom`
+     trick just below relies on a flush, unrounded bottom edge to sell
+     that). A same-day follow-up briefly rounded all four corners instead
+     - corrected back to top-only once the square-bottom requirement was
+     stated explicitly. */
+.tab-button {
+	width: 150px;
+	text-align: center;
+	align-self: stretch;
+	margin-bottom: -0.75rem;
+	border-radius: 8px 8px 0 0;
+	/* Stacked above .nav-logo when a narrow window makes the two overlap
+	   (01/09/2026, explicit ask - the logo used to slide left over the tab
+	   labels at that width). .nav-logo is `position: absolute` with no
+	   explicit z-index; a positioned element paints above non-positioned
+	   content regardless of z-index, which is *why* it was winning that
+	   overlap before - not a z-index number it lost, but never being a
+	   positioned element in the first place. Giving the tab its own
+	   `position: relative` puts it in the same comparison, and z-index: 1
+	   (> .nav-logo's explicit 0 below) settles it. Harmless on
+	   .user-admin-toolbar's reuse of this same class too - no absolutely
+	   positioned sibling to overlap there. */
+	position: relative;
+	z-index: 1;
+}
+
+/* App icon, dead-center of the bar regardless of how wide the tab group or
+   the account control on either side are (explicit ask) - absolutely
+   positioned against .screen-nav itself rather than a 3-column layout, so
+   it stays centered on the bar even if those two groups are asymmetric.
+   z-index: 0 explicit (01/09/2026) - see .tab-button's own comment on why
+   a narrow window used to let this slide on top of the tab labels. */
+.nav-logo {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 0;
+	/* photodiary-banner-short.png is a wide banner (858x201), not a square
+	   icon like the old mpd.png this replaced - height fixed, width auto to
+	   keep its own aspect ratio rather than stretching/squashing it. */
+	height: 32px;
+	width: auto;
+}
+
+/* Signed-in-as/Sign out - one control, always in this exact top-right spot
+   regardless of which screen is showing (explicit ask, replacing each
+   screen's own duplicated header). */
+.nav-account {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: rgb(220, 220, 220);
+}
+
+/* Language switcher (28/08/2026, explicit ask - replaces "Signed in as
+   {username}" in this same top-right spot; a <select> itself, not a
+   wrapping element around a row of buttons - a second explicit ask changed
+   it from three individual buttons to this dropdown). Same fair-grey fill
+   as every plain button in this app (the base `button` rule above) for
+   visual consistency in this black toolbar, rather than an unstyled native
+   dropdown. */
+.language-switcher {
+	padding: 0.3rem 0.5rem;
+	font-size: 0.8rem;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	background: rgb(225, 225, 225);
+	color: #1a1a1a;
+	cursor: pointer;
+}
+
+/*************************************
+** Gallery screen
+**
+** Full-height flex chain (.gallery-screen -> .gallery-layout ->
+** .gallery-main -> .gallery-body), not a fixed vh guess: the image is the
+** primary content here (a direct ask - it should take as much surface as
+** the viewport allows), so .photo-frame gets whatever space is left after
+** the thin header/toolbar, not a small box competing with permanently-
+** visible upload/settings panels below it. Those are collapsed by default
+** (GalleryScreen's showUploader/showDetail) instead, matching the spirit of
+** the legacy popups (importPopup/dirEditPopup) they replace: reachable on
+** demand, not permanent screen real estate.
+*************************************/
+.gallery-screen {
+	display: flex;
+	flex-direction: column;
+	/* flex: 1, not a height of its own - .app-screen (the actual
+	   viewport-height owner, see its comment) hands this exactly the space
+	   left after the nav bar; flex:1 children further down (.gallery-layout
+	   -> .gallery-main -> .gallery-body) only actually get capped to that -
+	   letting .photo-frame truly fill it - because every level in the chain
+	   has a definite height to distribute, not just a lower bound. */
+	flex: 1;
+	min-height: 0;
+}
+
+.directory-picker {
+	display: flex;
+	gap: 1rem;
+	align-items: center;
+	max-width: 1200px;
+	margin: 0 auto 1rem;
+	padding: 0 1rem;
+}
+
+.directory-create-form {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.gallery-toolbar {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 0.5rem;
+	flex-shrink: 0;
+}
+
+.gallery-body {
+	display: flex;
+	gap: 0;
+	flex: 1;
+	min-height: 0;
+}
+
+/* .photo-frame, #rsidebar/#rslider, .focusThumb/.noFocusThumb and .postit
+   below are ported from idx.css as closely as the layout mechanics allow
+   (Design.md decision #8) - same colors, same film.png texture, same
+   thumbnail borders and sticky-note styling. Positioning is adapted from
+   `fixed` full-viewport (legacy assumed index.jsp had no page chrome above
+   it) to flow layout, since this app has a screen-nav bar above it that
+   index.jsp never had; `left: 197px` (reserved in idx.css for a nav
+   sidebar) is dropped until that screen (Design.md §16.9 step 3) exists. */
+.photo-frame {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+	/* Same background as .photo-full-screen (01/09/2026, explicit ask) - was
+	   a plain rgb(25,25,25), no texture. Kept as its own declaration here
+	   (not merged into one shared rule with .photo-full-screen) since the
+	   two still differ on everything else (flow vs fixed positioning, the
+	   border-bottom below, padding, z-index). */
+	background-color: black;
+	background-image: url('/legacy/dotted-pattern.png');
+	border-bottom: 3px solid rgb(35, 35, 35);
+	min-width: 0;
+	min-height: 0;
+}
+
+/* .photo-frame is a *row* flex container by default (no flex-direction of
+   its own) - fine when it only ever holds one child (GalleryScreen's own
+   image-only empty case), but SearchScreen's "no matches" case renders a
+   <p> next to the <img> (23/09/2026, "put the text back above the default
+   image") - column here stacks them message-above-image as asked, with no
+   effect on GalleryScreen's single-child case. */
+.photo-frame-empty {
+	color: rgb(150, 150, 150);
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.visible-image {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+}
+
+/* Progressive image loading (ProgressiveImage.jsx, 10/09/2026, explicit ask
+   - "on slow 3/4G networks it is lengthy to load the images"). Shown in
+   place of .visible-image/.mobile-visible-image while the real "web"-tier
+   image is still downloading - one shared set of rules for both desktop
+   (.photo-frame) and mobile (.mobile-photoframe), since both are already
+   flex-centered containers a `width/height: 100%` child fills identically. */
+.progressive-image {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+.progressive-image-thumbnail {
+	width: 100%;
+	height: 100%;
+	/* contain, same as .visible-image itself (16/09/2026, corrected from an
+	   earlier `cover` - explicit ask: "mapped to the same area as the
+	   corresponding webimg picture", not filling/cropping to the frame's own
+	   edges regardless of the picture's own shape). The thumbnail and the
+	   "web" tier are both aspect-ratio-preserving derivatives of the same
+	   original (Thumbnailator bounds, never crops), so `contain` here
+	   letterboxes the thumbnail at *exactly* the same position/size the real
+	   image will occupy a moment later - the placeholder and the final swap
+	   line up instead of the frame appearing to "zoom out" at that moment. */
+	object-fit: contain;
+	filter: blur(6px);
+}
+
+.progressive-image-progress {
+	position: absolute;
+	left: 10%;
+	right: 10%;
+	/* Vertically centered (16/09/2026, explicit ask - was `bottom: 16px`),
+	   not anchored to the frame's own bottom edge: on mobile that put it
+	   right behind `.mobile-home-footer` (Menu/Go/Comment - an opaque
+	   overlay of its own near the frame's bottom, higher z-index),
+	   invisible in practice even though the bar was technically still
+	   there. Centering keeps it clear of both `.mobile-home-header` and
+	   `.mobile-home-footer` regardless of their own height, and is equally
+	   fine on desktop (`.photo-frame` has no header/footer overlay at all
+	   to avoid). */
+	top: 50%;
+	transform: translateY(-50%);
+	height: 6px;
+	border-radius: 3px;
+	background: rgba(0, 0, 0, 0.5);
+	overflow: hidden;
+}
+
+.progressive-image-progress-bar {
+	height: 100%;
+	width: 0%;
+	border-radius: 3px;
+	background: rgb(210, 210, 210);
+	transition: width 150ms ease;
+}
+
+/* No usable Content-Length to compute a real percentage from - a sweeping
+   bar instead of a stalled 0%, same "something is happening" signal an
+   indeterminate progress bar gives anywhere else. */
+.progressive-image-progress-indeterminate {
+	width: 40% !important;
+	animation: progressive-image-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes progressive-image-indeterminate {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(350%);
+	}
+}
+
+/* Cross-fade between pictures (ImageViewer.jsx, 28/08/2026, explicit ask) -
+   two of these stacked on top of each other during a transition (the
+   outgoing one behind, fading out; the incoming/current one - always
+   .crossfade-current, see ImageViewer's own comment - fading in), each
+   filling .photo-frame entirely (`inset: 0`, .photo-frame is already
+   `position: relative`) and centering its own media the same way the frame
+   itself used to when there was only ever one layer. */
+.crossfade-layer {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.crossfade-in {
+	/* 800ms (28/08/2026, explicit ask - was 400ms) */
+	animation: crossfade-in 800ms ease forwards;
+}
+
+.crossfade-out {
+	animation: crossfade-out 800ms ease forwards;
+	/* Fading out and on its way out - shouldn't intercept clicks meant for
+	   the incoming layer (or the controls-bar/postit above both layers). */
+	pointer-events: none;
+}
+
+@keyframes crossfade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes crossfade-out {
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0;
+	}
+}
+
+/* Next-image preload (ImageViewer.jsx) - fetched ahead of time via a hidden
+   AuthImage, same spirit as legacy's own preloadSel, never rendered. */
+.preload-image {
+	display: none;
+}
+
+/* Same class-swap the legacy fullScreen() toggle does (idx.css
+   .photo-full-screen) - covers the whole viewport, same dotted-pattern
+   texture, paired with the real HTML5 Fullscreen API in ImageViewer.jsx. */
+.photo-full-screen {
+	position: fixed;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: black;
+	background-image: url('/legacy/dotted-pattern.png');
+	padding: 5px;
+	z-index: 110;
+}
+
+/* Top controls bar - #controls-topleft (delete) / #controls-top (play) /
+   #controls-topright (full-screen) in index.jsp, same 44x44 icons copied
+   byte-for-byte. Hidden until hovered, exactly like idx.css's
+   .controls-bar (opacity 0 -> 0.8), so it doesn't compete with the image
+   for attention when the viewer isn't actively being used. */
+.controls-bar {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 47px;
+	z-index: 4;
+	opacity: 0;
+	transition: opacity 0.3s;
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	padding: 5px;
+}
+
+.controls-bar:hover {
+	opacity: 0.85;
+}
+
+/* Gallery's single toolbar (27/09/2026, explicit ask - replaces the
+   separate bottom toolbar): three groups - left (sequence link, image link,
+   Comment), Play, right (Edit, Delete, Full-screen). A `1fr auto 1fr` grid
+   rather than .controls-bar's own `space-between`, so Play stays exactly
+   centered on the picture even when the right group has one icon fewer
+   (no Edit for a video). */
+.controls-bar-grouped {
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
+}
+
+.controls-group {
+	display: flex;
+	gap: 8px;
+}
+
+.controls-group-right {
+	justify-content: flex-end;
+}
+
+#controls-topleft,
+#controls-top,
+#controls-topright,
+.controls-button {
+	cursor: pointer;
+}
+
+/* Same footprint as a real icon (see the `img`/`svg` sizing rule just below,
+   32x32) but otherwise empty - keeps .controls-bar's 3-slot `space-between`
+   math (and therefore Play's own centering) true when there's no real
+   topleft icon to render (ImageViewer.jsx's own comment). */
+.controls-bar-spacer {
+	width: 32px;
+	height: 32px;
+}
+
+#controls-topleft img,
+#controls-top img,
+#controls-topright img,
+.controls-button img,
+#controls-left img,
+#controls-right img,
+/* Search screen's directory-link icon, and the Gallery-only image-link/
+   sequence-link/rotate icons (ImageViewer.jsx) are all inline <svg>, not
+   legacy <img> - no legacy asset exists for any of them (new features, no
+   legacy equivalent), hand-drawn to match the same 32px sizing as the
+   ported PNG icons instead. */
+#controls-topleft svg,
+.controls-button svg {
+	width: 32px;
+	height: 32px;
+	display: block;
+}
+
+#controls-left,
+#controls-right {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 2;
+	opacity: 0.4;
+	cursor: pointer;
+	padding: 0.5rem;
+	user-select: none;
+}
+
+#controls-left {
+	left: 5px;
+}
+
+#controls-right {
+	right: 5px;
+}
+
+#controls-left:hover,
+#controls-right:hover {
+	opacity: 1;
+}
+
+#rsidebar {
+	/* 184px, not 170px (03/09/2026, explicit ask) - #rslider below (the
+	   actual film-textured column) needs a real, fixed 170px to render
+	   film.png's own right-edge sprocket holes uncropped (see #rslider's
+	   own comment); this box is deliberately wider than that, so the
+	   scrollbar this element's own `overflow-y: auto` can produce has
+	   somewhere of its own to live - a dedicated ~14px gutter to #rslider's
+	   right - instead of eating into #rslider's own width. */
+	width: 184px;
+	flex-shrink: 0;
+	background-color: rgb(25, 25, 25);
+	border-bottom: 3px solid rgb(35, 35, 35);
+	/* Thin grey divider along the filmstrip's own left edge (25/09/2026,
+	   explicit ask, width/color corrected same day to exactly match
+	   .screen-nav's own border-bottom - the horizontal line below the main
+	   tabs - rather than the thinner 1px this started as) - 2px solid
+	   rgb(90,90,90), not the much darker border-bottom above (that one
+	   matches .photo-frame's own bottom edge specifically, a different,
+	   pre-existing convention this doesn't touch). Shared by Gallery and
+	   Search (both render #rsidebar - this file's own comment further down
+	   on "Search screen... shares... #rsidebar with the" Gallery screen),
+	   so one rule covers both automatically. */
+	border-left: 2px solid rgb(90, 90, 90);
+	overflow-y: auto;
+	/* Full height even when empty/partially empty (28/08/2026, explicit ask
+	   - reverts a previous explicit ask that had set align-self:flex-start
+	   + max-height:100% here specifically so an empty/short filmstrip
+	   wouldn't stretch the film texture past the last real thumbnail. Back
+	   to the default flex `align-items: stretch` from .gallery-body, so
+	   this column always fills the same height as .photo-frame beside it,
+	   same as it did before that change. */
+}
+
+#rslider {
+	/* Real bug found live (03/09/2026): film.png is a 170x32 asset, exactly
+	   matching what used to be #rsidebar's own full width - #rslider had no
+	   width of its own, just filling whatever #rsidebar's *content* box
+	   happened to be. That content box shrinks by the scrollbar's own width
+	   the moment #rsidebar actually has something to scroll (a long
+	   sequence) - #rslider (and the film.png background painted on it)
+	   shrank right along with it, cropping the texture's own right-edge
+	   holes exactly where the newly-added scrollbar (previous tranche, the
+	   "silver" styling) now sits, instead of leaving them alone. A fixed,
+	   explicit width here - matching film.png's own real size, not just
+	   "however much room #rsidebar happens to have left" - renders
+	   identically whether or not #rsidebar's scrollbar is currently shown;
+	   #rsidebar's own extra width (above) is exactly the room the
+	   scrollbar's gutter needs, kept separate from this element on purpose.
+	   flex-shrink: 0 for the same reason `width` alone doesn't already
+	   guarantee it - #rsidebar is a plain block, not a flex container, so
+	   this is only a defensive backstop, not load-bearing today. */
+	width: 170px;
+	flex-shrink: 0;
+	position: relative;
+	padding: 16px;
+	background-image: url('/legacy/film.png');
+	background-repeat: repeat-y;
+	background-color: black;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	/* Fills #rsidebar's own now-stretched height (not just its own content) -
+	   without this, the film texture itself would still stop right after
+	   the last thumbnail even though the darker #rsidebar box behind it
+	   already extends the full height. */
+	min-height: 100%;
+	box-sizing: border-box;
+}
+
+.focusThumb {
+	border: 5px solid rgb(180, 180, 180);
+	margin: 5px 0;
+	width: 128px;
+	cursor: pointer;
+	display: block;
+}
+
+.noFocusThumb {
+	border: 5px solid black;
+	margin: 5px 0;
+	width: 128px;
+	cursor: pointer;
+	display: block;
+}
+
+/* Video badge (Filmstrip.jsx, 28/08/2026) - a small play triangle centered
+   over a video's own thumbnail, the only visual cue distinguishing it from
+   a photo in the filmstrip (the thumbnail bytes themselves are indistinguishable,
+   both are plain JPEG frames). Pointer-events none so it never blocks the
+   click-to-select the thumbnail underneath already handles. */
+.filmstrip-thumb-wrap {
+	position: relative;
+}
+
+.filmstrip-video-badge {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 0;
+	height: 0;
+	border-top: 10px solid transparent;
+	border-bottom: 10px solid transparent;
+	border-left: 16px solid rgba(255, 255, 255, 0.85);
+	filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+	pointer-events: none;
+}
+
+/* Empty-slot placeholders (Filmstrip.jsx, 29/08/2026, explicit ask) - fill
+   whatever rail space is left below the real thumbnails. Same width and
+   the same border-as-margin/margin trick as .noFocusThumb (border colored
+   to match #rslider's own background, so it reads as a black margin around
+   the grey rectangle rather than a visible frame), but a plain 2/3
+   height/width rectangle rather than any particular photo's own aspect
+   ratio - see Filmstrip.jsx's own PLACEHOLDER_HEIGHT for why the two stay
+   in sync. Not selectable: no hover/cursor styling, and pointer-events
+   none so they can't even be clicked past to whatever the rail's own
+   background is doing underneath. */
+.filmstrip-placeholder {
+	width: 128px;
+	height: calc(128px * 2 / 3);
+	border: 5px solid black;
+	margin: 5px 0;
+	background-color: rgb(90, 90, 90);
+	pointer-events: none;
+}
+
+/* Outer sticky note - two .postitarea blocks stacked inside (sequence
+   comment first, then the picture's own - same order as index.jsp's
+   #dirDesc/#imgDesc), each opening its own popup on click rather than
+   editing inline (see PostIt.jsx). */
+/* Hidden by default on desktop (explicit ask, 28/08/2026, revised the same
+   day from an earlier always-visible-until-faded version) - opacity only,
+   not `display`/unmount, so it stays hoverable/clickable even while
+   invisible (a cursor has to be able to *find* it by hovering roughly
+   where it is, the same "invisible but still interactive" contract
+   legacy's own div.postit:hover uses, idx.css). PostIt.jsx's `.visible`
+   modifier (hover, or a click's pin - see its own comment) is what
+   actually reveals it; MobilePostIt never applies that modifier's
+   trigger logic at all (no `fadeDelayMs`), so its own conditionally-
+   mounted post-it - a separate, harder show/hide, not this fade - always
+   renders with `.visible` already applied, i.e. unaffected by any of this. */
+.postit {
+	position: absolute;
+	top: 20px;
+	left: 20px;
+	max-width: 300px;
+	z-index: 3;
+	background: #fefabc;
+	padding: 15px;
+	font-family: 'Comic Sans MS', 'Gloria Hallelujah', cursive;
+	color: #111;
+	transform: rotate(-1deg);
+	box-shadow: 5px 6px 10px rgba(20, 20, 20, 0.8);
+	border-radius: 8px 0 8px 0;
+	opacity: 0;
+	transition: opacity 0.6s ease;
+	cursor: pointer;
+}
+
+.postit.visible {
+	opacity: 1;
+}
+
+.postitarea {
+	cursor: pointer;
+	padding: 0.2rem 0 0.6rem;
+}
+
+.postitarea:hover {
+	background: rgba(17, 17, 17, 0.06);
+}
+
+.postitarea hr {
+	border: none;
+	border-top: 1px solid rgba(17, 17, 17, 0.25);
+	margin: 0 0 0.5rem;
+}
+
+/* "Click to describe..." placeholder (no comment saved yet) - light grey
+   (explicit ask, 28/08/2026 - was medium grey rgb(90,90,90)), same
+   rgb(150,150,150) already used for hint/placeholder text elsewhere in this
+   stylesheet, still legible against the post-it's own pale yellow
+   background. Shared by both desktop (PostIt) and mobile (MobilePostIt
+   wraps the same component/CSS, decision #8) - one rule, both UIs. Distinct
+   from an actual saved comment's default dark text. */
+.postitarea em {
+	color: rgb(150, 150, 150);
+}
+
+.postitarea:first-child hr {
+	display: none;
+}
+
+/*************************************
+** Rating bar (ported from idx.css - same 4-frame sprite). Lives inside the
+** picture-description popup now (idx.css's own #ratingBar is part of the
+** imgEdit form, not a bar always visible on the frame - see ImageEditForm).
+*************************************/
+div.br-widget {
+	margin: 0.75rem 0 0;
+	height: 24px;
+}
+
+.br-widget a {
+	background: url('/legacy/star.png');
+	width: 24px;
+	height: 24px;
+	display: block;
+	float: left;
+	cursor: pointer;
+}
+
+.br-widget a.br-active {
+	background-position: 0 24px;
+}
+
+/* Invisible until opened from the toolbar - see Popup.jsx's comment. */
+.gallery-uploader {
+	width: 100%;
+}
+
+/* Gallery-screen popups (Popup.jsx) - idx.css's `.popup`/`.popup_background`/
+   `#popup_close`, ported at the same 50%/70% size and centering technique,
+   just `position:fixed` instead of `absolute` so it centers on the viewport
+   regardless of which ancestor happens to be positioned. z-index sits above
+   `.photo-full-screen` (110): the post-it that opens these popups is
+   reachable in full-screen mode too (it's part of `.photo-frame`, rendered
+   in both states), so a popup opened from there must still land on top of
+   the full-screen frame, not behind it. */
+.gallery-popup-backdrop {
+	position: fixed;
+	inset: 0;
+	background-color: grey;
+	opacity: 0.6;
+	z-index: 120;
+}
+
+.gallery-popup {
+	position: fixed;
+	margin: auto;
+	inset: 0;
+	width: 50%;
+	height: 70%;
+	min-width: 320px;
+	min-height: 320px;
+	max-width: 640px;
+	border-radius: 0 0 0 16px;
+	box-shadow: -3px 6px 10px #111;
+	background-color: black;
+	z-index: 121;
+}
+
+/* Image editor popup (25/09/2026) - wider/taller than the default form
+   popup above, needs real room to drag crop handles precisely. Higher
+   specificity than `.gallery-popup` alone (two classes on the same
+   element, Popup.jsx's own `className` prop) rather than a second,
+   separate modal component. */
+.gallery-popup.image-editor-popup {
+	width: 90%;
+	height: 85%;
+	max-width: 900px;
+}
+
+/* Flex column filling the popup's own real (percentage-based, so this
+   reacts to a window resize) height - `.gallery-popup-body` normally just
+   scrolls (`overflow-y: auto`) when its content is taller than the popup,
+   but the whole point of the JS-computed canvas sizing below is that
+   nothing here should ever need to scroll (explicit ask, 25/09/2026 -
+   "fit entirely in the popup area without sliders") - `overflow: hidden`
+   here is a deliberate confirmation of that, not just a leftover default. */
+.image-editor-popup .gallery-popup-body {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.image-editor {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+/* Two groups (`.image-editor-actions-left`/`-right` below), pushed apart by
+   `space-between` - explicit ask, 25/09/2026: "Rotate right, Crop,
+   Transform" together in the left corner, "Cancel, Save" together in the
+   right corner, with a gap between the two groups rather than one flat row
+   of 5 buttons in a fixed order. */
+.image-editor-actions {
+	display: flex;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	flex: 0 0 auto;
+	margin-bottom: 0.75rem;
+}
+
+.image-editor-actions-left,
+.image-editor-actions-right {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+/* Takes up all the vertical space left after the actions row (`flex: 1 1
+   auto`, `min-height: 0` so it can actually shrink to fit rather than
+   overflowing its own flex parent) - ImageEditorPopup.jsx's own doc
+   comment on why the canvas itself is sized in JS (a ResizeObserver on
+   this element) rather than left to pure CSS `aspect-ratio`: a plain block
+   box doesn't get the "shrink to fit both max-width and max-height at
+   once, preserving ratio" treatment that only a replaced element (a real
+   `<img>`) or a shrink-to-fit layout context gets for free. Centers the
+   canvas once it's smaller than this wrapper on either axis (a portrait
+   photo in a landscape-shaped popup, or vice versa). */
+.image-editor-canvas-wrapper {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+
+.image-editor-canvas {
+	position: relative;
+	overflow: hidden;
+	width: 100%;
+	height: 100%;
+	background: rgb(20, 20, 20);
+	touch-action: none;
+}
+
+.image-editor-media {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+/* The classic "darken everything outside the crop box" look, via a single
+   oversized box-shadow rather than four separate overlay panels - the
+   parent's own `overflow: hidden` clips it back down to the canvas's real
+   bounds. Border only, transparent fill, so the selection's own inside
+   keeps showing the real image underneath. */
+.image-editor-selection {
+	position: absolute;
+	border: 2px dashed white;
+	box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+	pointer-events: none;
+}
+
+.image-editor-handle {
+	position: absolute;
+	width: 14px;
+	height: 14px;
+	margin: -7px;
+	border-radius: 50%;
+	background: white;
+	border: 1px solid rgb(60, 60, 60);
+	pointer-events: auto;
+}
+
+.image-editor-handle-top,
+.image-editor-handle-bottom {
+	cursor: ns-resize;
+}
+
+.image-editor-handle-left,
+.image-editor-handle-right {
+	cursor: ew-resize;
+}
+
+/* The quad's own live wireframe outline (Transform's corner handles,
+   25/09/2026) - a distinct yellow, solid line, deliberately different from
+   the crop rectangle's own white dashed border immediately above, so the
+   two overlapping shapes (both shown together in edit mode) stay visually
+   unambiguous. `pointer-events: none` so the outline itself never steals a
+   drag from the handles sitting on top of it. */
+.image-editor-quad-outline {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+}
+
+.image-editor-quad-outline polygon {
+	fill: none;
+	stroke: rgb(245, 196, 0);
+	stroke-width: 2;
+	/* Keeps the stroke a consistent 2px on screen regardless of the
+	   viewBox's own non-uniform scaling (preserveAspectRatio="none" on a
+	   canvas whose real aspect ratio isn't the viewBox's own 1:1 square) -
+	   without this, the line would render visibly thicker along whichever
+	   axis the canvas is more stretched on. */
+	vector-effect: non-scaling-stroke;
+}
+
+/* Square, not round - same yellow as the quad outline above, so a corner
+   handle reads at a glance as "belongs to the quad", distinct from the
+   crop rectangle's own round white edge handles. */
+.image-editor-handle-corner {
+	border-radius: 0;
+	background: rgb(245, 196, 0);
+	cursor: move;
+}
+
+.gallery-popup-close {
+	width: 32px;
+	height: 32px;
+	position: absolute;
+	top: -16px;
+	right: -16px;
+	cursor: pointer;
+	z-index: 122;
+}
+
+.gallery-popup-body {
+	position: absolute;
+	inset: 0;
+	padding: 20px;
+	overflow-y: auto;
+	box-sizing: border-box;
+	color: rgb(220, 220, 220);
+}
+
+.gallery-popup-body h3 {
+	margin-top: 0;
+}
+
+/* Capture date/time (ImageEditForm, 28/08/2026) - between the name and the
+   description, muted like .search-result-count's own metadata-not-content
+   treatment on this same dark surface. */
+.image-capture-date {
+	color: rgb(150, 150, 150);
+	font-size: 0.85rem;
+	margin: 0.25rem 0 0;
+}
+
+.gallery-popup-body label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.85rem;
+	margin-top: 0.75rem;
+}
+
+.gallery-popup-body textarea,
+.gallery-popup-body input {
+	padding: 0.4rem;
+	font-family: inherit;
+}
+
+.gallery-popup-actions {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	flex-wrap: wrap;
+	margin-top: 1rem;
+}
+
+/* Sequence geolocation picker (SequenceGeolocationForm) - Leaflet (like
+   Google Maps before it, 16/09/2026 swap) requires an explicitly sized
+   container, it won't fill height:auto on its own. */
+.sequence-map {
+	width: 100%;
+	height: 320px;
+	margin-top: 0.75rem;
+	border: 1px solid rgb(80, 80, 80);
+}
+
+/*************************************
+** Navigation/indexing screen (directory tree, attribute tree, search)
+*************************************/
+/* No max-width/centering (28/08/2026, explicit ask - was max-width:1600px;
+   margin:0 auto, capping and centering this row) - above ~1600px wide, that
+   left the sidebar and filmstrip floating with a gap on each side instead
+   of touching the real window edges. Full width, no horizontal padding: the
+   sidebar and #rsidebar (the filmstrip, at the far end of .gallery-main's
+   own .gallery-body) are the first/last flex children of this row, so
+   removing the outer gap makes them sit flush against the actual viewport
+   edges regardless of window width, exactly as asked - not just "less of a
+   gap". */
+.gallery-layout {
+	display: flex;
+	/* 3px (01/09/2026, explicit ask - was 1rem/16px) - this gap has no color
+	   of its own, it's just empty space between the black .gallery-sidebar
+	   and .gallery-main; what reads as a "dark grey vertical bar" here is
+	   the page's own rgb(25,25,25) body background showing through it. */
+	gap: 3px;
+	width: 100%;
+	padding: 0 0 1rem;
+	flex: 1;
+	min-height: 0;
+	box-sizing: border-box;
+}
+
+/* Black background (explicit ask, 28/08/2026) - was the page's own
+   rgb(25,25,25) by default (no override), now matches the black already
+   used for the top nav/photo-frame/postit surfaces elsewhere in the app. */
+.gallery-sidebar {
+	width: 260px;
+	flex-shrink: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	min-height: 0;
+	overflow-y: auto;
+	background: black;
+	/* Same border-bottom as .photo-frame (01/09/2026, explicit ask) - so
+	   both bottom edges line up precisely instead of only .photo-frame
+	   showing this line. */
+	border-bottom: 3px solid rgb(35, 35, 35);
+	/* Thin grey divider along the sidebar's own right edge (25/09/2026,
+	   explicit ask, width/color corrected same day to exactly match
+	   .screen-nav's own border-bottom, same 2px/rgb(90,90,90) as #rsidebar's
+	   own border-left just above - that comment has the full reasoning).
+	   `.gallery-sidebar` is itself the shared class already used by both
+	   Gallery and Search's own sidebars, so one rule here covers both. */
+	border-right: 2px solid rgb(90, 90, 90);
+	padding: 0 1rem 1rem;
+}
+
+/* Publish pictures (first in the sidebar) and Sequence geolocation (right
+   below it) - same plain default button color (explicit ask: Publish used
+   to be blue, now matches Geolocation's own plain white/dark styling), full
+   width to match the rest of the sidebar. 20px spacer above Publish
+   (explicit ask, 28/08/2026) - the sidebar has no top padding of its own
+   (see above), so this is the only gap between it and the black background's
+   own top edge. Search screen's own sidebar (10/09/2026, explicit ask -
+   "similar to the publish-button") reuses this exact rule for its own pair
+   (download-all/download-current) via dedicated classes rather than these
+   two names - see SearchScreen.jsx's own comment for why. */
+.publish-button,
+.geolocation-button,
+.download-all-button,
+.download-current-button {
+	width: 100%;
+}
+
+/* .download-all-button *used* to carry this same 20px top spacer too, back
+   when it was the first thing in Search's own sidebar - once the criteria
+   (and .search-text's own identical spacer) moved above it and
+   .search-criteria-separator was added right before it (11/09/2026), that
+   leftover margin was still adding an extra 20px *below* the separator on
+   top of .gallery-sidebar's own 0.75rem `gap`, throwing off what should be
+   an evenly centered line (measured live: 12px above, 32px below, before
+   this fix) - not a rounding fluke, a real stale rule from before this
+   button's position in the sidebar changed. `.publish-button` alone keeps
+   it; it's still genuinely first in Gallery's own sidebar. */
+.publish-button {
+	margin-top: 20px;
+}
+
+.gallery-main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+/* Tree (directory tree + attribute tree) - ported from idx.css's own
+   fancytree overrides (black bg, light-gray text, thin gray border), not
+   fancytree's default skin - see DirectoryTree.jsx's comment. */
+.directory-tree {
+	background: black;
+	border: 1px solid gray;
+	max-height: 50vh;
+	overflow-y: auto;
+	padding: 0.5rem 0;
+}
+
+/* Gallery sidebar's own tree specifically (03/09/2026, explicit ask) - the
+   50vh cap above was an arbitrary leftover from before `.gallery-sidebar`
+   became a proper flex column with a real bounded height of its own
+   (min-height:0, this file's own comment on that class); once it had one,
+   50vh was frequently *less* than the space actually available below the
+   Publish/Sequence-geolocation buttons, needlessly leaving the tree short
+   with its own scrollbar while empty sidebar space sat unused beneath it.
+   `flex: 1; min-height: 0; max-height: none` instead lets the tree claim
+   exactly the remaining sidebar height, whatever that is - still scrolling
+   internally (this rule doesn't touch `overflow-y`) once its own content
+   genuinely exceeds that. Scoped to this one context, not a blanket
+   override of `.directory-tree` above - `AttributeAdmin.jsx` reuses that
+   same base class outside any comparable flex column, where the original
+   50vh cap still applies unchanged. Same reasoning for `border-color`
+   (11/09/2026, explicit ask - "darken the thin line around the
+   directory-tree rectangle") - darkened only here, for the Gallery
+   screen's own tree, not in the shared base rule above which would have
+   also changed the Admin Tags tree's own border, not asked for. */
+.gallery-sidebar .directory-tree {
+	flex: 1;
+	min-height: 0;
+	max-height: none;
+	border-color: rgb(90, 90, 90);
+}
+
+.tree-row {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.15rem 0.5rem 0.15rem 0;
+	cursor: pointer;
+	color: rgb(220, 220, 220);
+	font-size: 0.85rem;
+}
+
+.tree-row:hover {
+	background: rgb(30, 30, 30);
+}
+
+.tree-row-selected {
+	background: rgb(40, 40, 60);
+}
+
+.tree-row-indexed .tree-title {
+	color: #7ec8ff;
+}
+
+/* Attribute drag-and-drop reparenting (AttributeAdmin.jsx) - legacy's
+   fancytree dnd extension. */
+.tree-drag-source {
+	opacity: 0.4;
+}
+
+.tree-drop-target {
+	background: rgb(37, 99, 235, 0.35);
+	outline: 1px dashed #7ec8ff;
+	outline-offset: -1px;
+}
+
+.tree-toggle {
+	width: 1rem;
+	text-align: center;
+	color: rgb(150, 150, 150);
+	user-select: none;
+}
+
+/* Root row (DirectoryTree's own first entry, above every year - explicit
+   ask) - a folder icon, white on the tree's own black background, in the
+   same slot the ▸/▾ toggle triangle occupies on every row below it. */
+.tree-root-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.tree-root-icon svg {
+	width: 0.85rem;
+	height: 0.85rem;
+}
+
+.tree-title {
+	flex: 1;
+}
+
+.tree-count {
+	font-size: 0.75rem;
+	color: rgb(150, 150, 150);
+	background: rgb(40, 40, 40);
+	border-radius: 8px;
+	padding: 0 0.4rem;
+}
+
+.tree-loading,
+.tree-empty {
+	color: rgb(150, 150, 150);
+	font-size: 0.85rem;
+	padding: 0.5rem;
+	margin: 0;
+}
+
+.tree-actions {
+	display: flex;
+	gap: 0.5rem;
+	font-size: 0.75rem;
+}
+
+.tree-actions a {
+	cursor: pointer;
+	color: #7ec8ff;
+	text-decoration: underline;
+}
+
+.tree-rename-input {
+	flex: 1;
+	font-size: 0.85rem;
+	padding: 0.1rem 0.3rem;
+}
+
+.tree-add-child-form {
+	display: flex;
+	gap: 0.4rem;
+	padding-block: 0.25rem;
+}
+
+/* Tag selection - a native `<select multiple>`, same widget legacy itself
+   uses (dirEditPopup's #dirParams, imageEditPopup's #imgParams, both plain
+   `<select multiple size="8">`, idx.js) rather than a checkbox row - scales
+   to a large tag collection the way a checkbox list can't, and needs no JS
+   to support ctrl/cmd-click multi-selection, it's native browser behavior.
+   Used by DirectoryDetailPanel/ImageEditForm (28/08/2026) and, since,
+   Search's own attribute filter too (28/08/2026, same complaint about too
+   many tags not scaling) - Search's own selection is deliberately *not*
+   expanded to ancestors the way DirectoryDetailPanel/ImageEditForm's is:
+   there it's assigning an entity's real tag set (and the backend's own
+   addWithAncestors expects that), here it's only ever a filter passed
+   straight to GalleryService.search, which already matches on exactly the
+   names given - see SearchScreen's own handleAttributesChange comment. */
+.tag-multiselect {
+	width: 100%;
+	margin-top: 0.25rem;
+}
+
+/* Create-and-assign a brand-new tag inline (03/09/2026, explicit ask,
+   ImageEditForm/DirectoryDetailPanel) - same flex row shape as
+   .rename-form below, directly under the .tag-multiselect it complements. */
+.new-tag-form {
+	display: flex;
+	gap: 0.4rem;
+	margin-top: 0.4rem;
+}
+
+.new-tag-form input {
+	flex: 1;
+}
+
+/* Still used by the mobile search filter (MobileSearchPage) - a handful of
+   checkboxes on a single-purpose, single-screen mobile filter is fine;
+   desktop's own former checklist moved to `.tag-multiselect` above. */
+.attribute-checkbox {
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+	flex-direction: row !important;
+	font-size: 0.85rem;
+}
+
+.rename-form {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 0.4rem;
+}
+
+/* Name and Date (MM/YYYY, 05/10/2026) - each a small labeled field; the
+   error message, last in the form, takes its own full-width line. */
+.rename-form label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	font-size: 0.85rem;
+}
+
+.rename-date-input {
+	width: 7rem;
+}
+
+.rename-form .form-error {
+	flex-basis: 100%;
+}
+
+button.danger {
+	border-color: #b91c1c;
+	color: #b91c1c;
+}
+
+/* Tags panel (AttributeAdmin) - now a toggled inline panel inside the Admin
+   screen (explicit ask), same shape and unstyled wrapper as
+   ConfigPanel/IndexManagementPanel; only its body gets a size/surface. */
+.attribute-admin-body {
+	background: white;
+	color: #1a1a1a;
+	padding: 0.75rem 1rem;
+	border-radius: 6px;
+	margin-top: 0.5rem;
+	/* Same 900px as .user-admin-toolbar (the tabs bar above)/.index-management-panel
+	   (the other Admin forms) - was 500px (29/08/2026, explicit ask fixed
+	   this to match, not just "wider"). */
+	max-width: 900px;
+}
+
+/* Spacer between the "new root tag" bar and the tags tree below it (29/08/2026,
+   explicit ask) - same 20px value already used for the equivalent gaps
+   elsewhere on this screen (.users-panel's New user button, the sidebar's
+   own Publish button spacer). */
+.attribute-admin-body .directory-create-form {
+	margin-bottom: 20px;
+}
+
+.attribute-tree {
+	max-height: none;
+	/* Enough room below the last row to always have a genuinely empty area
+	   to drop a dragged tag onto (detach to the top level) - a tree that
+	   shrink-wraps its rows exactly would leave nowhere to aim for once it
+	   has any content at all (found live: dropping on the container's own
+	   center landed back on the last row instead of detaching it). */
+	min-height: 10rem;
+}
+
+/* Bottom band under every authenticated desktop screen (26/09/2026,
+   explicit ask): one uniform band (32px at first, 40px the same day to
+   fit a full-size 32px logo with a "Powered by" label before it), which moved
+   here from the top bar (.nav-logo - still used by the Login and Share
+   screens' own top bars). Replaces the old bottom spacing, which was not
+   uniform: Gallery got 16px (.gallery-layout's own padding-bottom) while
+   Search got 32px (that same padding *plus* .search-screen's own) - both
+   zeroed below inside .app-shell-with-footer so this band is the only
+   bottom spacing on either screen. Same rgb(25,25,25) the old padding let
+   show through (the body background), so the band looks like the old gap,
+   just taller on Gallery and now carrying the logo. */
+.screen-footer {
+	flex-shrink: 0;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4rem;
+	background: rgb(25, 25, 25);
+}
+
+/* Same muted grey as the other metadata text on dark grounds (.app-version). */
+.footer-label {
+	font-size: 0.85rem;
+	font-style: italic;
+	color: rgb(150, 150, 150);
+}
+
+/* Same 32px as the top bar's own .nav-logo it replaces, 4px clear of the
+   40px band's edges. */
+.footer-logo {
+	height: 32px;
+	width: auto;
+}
+
+.app-shell-with-footer .gallery-layout,
+.app-shell-with-footer .search-screen {
+	padding-bottom: 0;
+}
+
+/* Search screen - full-height flex, same as .gallery-screen (see its comment). */
+.search-screen {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	/* No horizontal padding (28/08/2026) - same edge-to-edge fix as
+	   .gallery-layout, so the filmstrip this screen shares with Gallery
+	   (#rsidebar) sticks to the real right edge here too, not just there. */
+	padding: 0 0 1rem;
+	box-sizing: border-box;
+}
+
+.search-screen .gallery-body {
+	max-width: none;
+	margin: 0;
+	padding: 0;
+}
+
+/* Search screen - shares .gallery-body/.photo-frame/#rsidebar with the
+   Gallery screen (a direct ask: search results should look and behave like
+   browsing the gallery, same filmstrip, same viewer controls - not a
+   separate grid+lightbox). The filter criteria themselves used to sit in
+   their own horizontal bar along the top edge - moved into .gallery-sidebar
+   instead (11/09/2026, explicit ask), stacked above the download buttons,
+   so these four rules now style a vertical stack rather than a row -
+   `width: 100%` explicitly on each (matching the sidebar's own buttons)
+   rather than relying only on `.gallery-sidebar`'s default flex `stretch`,
+   and no more `white-space: nowrap` (that existed to keep a label from
+   wrapping awkwardly in the old row layout - harmless either way stacked,
+   but no longer doing anything worth keeping the comment about). */
+.search-text,
+.search-attributes,
+.search-min-rating,
+.search-date-bound {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.85rem;
+	color: rgb(220, 220, 220);
+	width: 100%;
+}
+
+/* .search-text is the first control in the sidebar now (11/09/2026,
+   explicit ask) - same 20px spacer/reasoning as .publish-button's and
+   .download-all-button's own margin-top: the sidebar has no top padding
+   of its own, so this is the only gap between the first thing in it and
+   the black background's own top edge. */
+.search-text {
+	margin-top: 20px;
+}
+
+/* Separates the criteria above from the download buttons below (explicit
+   ask, 11/09/2026) - a plain <hr>, reset to a single thin grey rule rather
+   than any browser's own default groove/shadow styling. No margin of its
+   own - .gallery-sidebar's own `gap` (0.75rem) already spaces every flex
+   child evenly on *both* sides of this element by itself, so adding a
+   margin here would just double it up. Genuinely centered only once
+   `.download-all-button`'s own stale `margin-top: 20px` was removed too
+   (see that rule's own comment) - measured live before that fix: 12px
+   above this line, 32px below, not the symmetric gap this comment already
+   assumed. Same grey already used for borders throughout this app's dark
+   UI (e.g. .mobile-home-header button) - not the plain `gray`
+   .directory-tree still used until darkened just below, since this is a
+   new element, not something being toned down from an existing lighter
+   value. */
+.search-criteria-separator {
+	border: none;
+	border-top: 1px solid rgb(90, 90, 90);
+	width: 100%;
+	margin: 0;
+}
+
+.search-result-count {
+	color: rgb(150, 150, 150);
+	font-size: 0.85rem;
+	margin: 0.5rem 0 0.5rem 1rem;
+	flex-shrink: 0;
+}
+
+.filmstrip-sentinel {
+	height: 2rem;
+	text-align: center;
+	color: rgb(150, 150, 150);
+	font-size: 0.85rem;
+}
+
+/* Import options (ImportSvr's autoSort/createSubDir checkboxes) */
+.uploader {
+	background: black;
+	border: 1px solid gray;
+	padding: 0.75rem 1rem;
+}
+
+/* Drag & drop area decoration (01/09/2026, explicit ask) - oblique
+   black/yellow hazard stripes, at least 150px tall. Scoped to this
+   screen's own uploader (FilePond is only ever mounted here - mobile
+   dropped it entirely for a plain <input type=file>, MobileImportForm's
+   own comment explains why), not a bare `.filepond--drop-label` override
+   that would silently reach a second mount point later without anyone
+   deciding to. `min-height`, not `height` - .filepond--drop-label ships
+   its own `height: 0px` (filepond.css), and `min-height` still wins over
+   an explicit smaller `height` per the CSS box model, verified by actually
+   mounting FilePond and rendering it rather than assumed from reading the
+   two rules. */
+.uploader .filepond--drop-label {
+	min-height: 150px;
+	background-image: repeating-linear-gradient(45deg, #000 0px, #000 20px, #f5c400 20px, #f5c400 40px);
+	/* The default label text (filepond.css's own #4f4f4f) is barely legible
+	   over the black stripes - white plus a black outline (four offset
+	   shadows, not a single one, so the stroke stays visible at every
+	   angle around each letter) keeps "Drag & Drop your files or Browse"
+	   readable on both stripe colors, not just the yellow ones - a direct
+	   side effect of decorating the label, not a separate ask, but a
+	   silent regression otherwise. */
+	color: white;
+	text-shadow:
+		1px 1px 0 black,
+		-1px 1px 0 black,
+		1px -1px 0 black,
+		-1px -1px 0 black;
+}
+
+.import-options {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.5rem;
+	margin-bottom: 0.75rem;
+	color: rgb(220, 220, 220);
+	font-size: 0.85rem;
+}
+
+.import-option {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	flex-direction: row !important;
+}
+
+.sequence-name-input {
+	margin-left: 0.4rem;
+	padding: 0.25rem 0.4rem;
+	font-size: 0.85rem;
+}
+
+/* Mobile only (25/09/2026, explicit ask - "too compact... put the
+   checkbox and label on a first line, the textfield on a second line
+   below") - .import-option/.sequence-name-input above are shared with
+   desktop's Uploader.jsx, so this is scoped to .mobile-page-content
+   (MobileUploadPage/MobileCameraPage/MobileMoviePage's common ancestor,
+   via MobilePage) rather than changed at the shared rule - desktop keeps
+   checkbox, label and the field all on one row, untouched.
+   `flex-wrap`, not a switch to `column` - the checkbox and label
+   themselves stay side by side on their own first line; only the
+   sequence-name field needs pushed onto a second one, done by giving it
+   a full-row flex-basis (forces it not to fit on line 1) rather than an
+   explicit line break in the markup. */
+.mobile-page-content .import-option {
+	flex-wrap: wrap;
+}
+
+.mobile-page-content .sequence-name-input {
+	flex: 1 0 100%;
+	margin-left: 0;
+	margin-top: 0.4rem;
+}
+
+/*************************************
+** Mobile presentation (decision #9) - replaces mindex.jsp/mauth.jsp/midx.js.
+** Own component tree, but the same near-black app identity as the desktop
+** tree (this file's very first comment) rather than jQuery Mobile's "b"
+** (dark) theme swatch - there's nothing legacy-specific about that swatch
+** worth porting, unlike the postit/filmstrip identity, which IS reused
+** as-is (PostIt.jsx, imported by MobilePostIt.jsx).
+*************************************/
+
+.mobile-auth-page,
+.mobile-page {
+	/* `100vh` on a phone browser is the *layout* viewport - it includes the
+	   area the address/toolbar chrome can occupy, so a page sized to it is
+	   taller than what's actually visible, pushing the footer/last controls
+	   off-screen until the user scrolls (reported live, on a real handset -
+	   not visible in the headless verification pass, which has no browser
+	   chrome to begin with). `100dvh` (dynamic viewport height) tracks the
+	   real visible area as that chrome shows/hides; `100vh` above it is a
+	   plain fallback for a browser that doesn't understand `dvh` yet, not a
+	   competing value - such a browser simply never reaches the next line. */
+	height: 100vh;
+	height: 100dvh;
+	display: flex;
+	flex-direction: column;
+	background: rgb(25, 25, 25);
+	color: rgb(220, 220, 220);
+}
+
+/* Side panel width, single source of truth shared by .mobile-side-panel's
+   own size and the matching translateX() on .mobile-home-content.shifted -
+   see MobileSlidePanel's comment for why the panel is an overlay now,
+   not a flex sibling that pushed/shrank the picture pane. */
+.mobile-home-page {
+	--mobile-panel-width: min(75vw, 300px);
+	height: 100vh;
+	height: 100dvh;
+	position: relative;
+	overflow: hidden;
+	background: rgb(25, 25, 25);
+	color: rgb(220, 220, 220);
+}
+
+.mobile-home-main {
+	/* `position: relative` so the header/footer below can overlay it
+	   (`position: absolute`) instead of taking their own row - the picture
+	   gets the full height of this column, not the height minus two chrome
+	   bars, matching legacy's own `data-fullscreen="true"` home-page header/
+	   footer (mindex.jsp l.78/121). Full width now (not a shrinking flex
+	   item) - the side panel overlays it instead of sharing the row with
+	   it; `overflow: hidden` is what clips .mobile-home-content once it's
+	   shifted past the right edge. */
+	position: relative;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+.mobile-page-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.6rem 1rem;
+	background: black;
+	flex-shrink: 0;
+}
+
+/* Sign-in screen's own header (explicit ask, 01/09/2026 - the mobile
+   sign-in was the one screen still without the banner, unlike
+   .mobile-home-header/.nav-logo which already carry it). Distinct from
+   .mobile-page-header, not sharing its rule: that one lays its buttons out
+   left/right via space-between, this one only ever holds the banner above
+   the title, stacked and centered - no row layout needed. */
+.mobile-auth-header {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	padding: 1.2rem 1rem 0.8rem;
+	background: black;
+	flex-shrink: 0;
+}
+
+/* Same asset as .mobile-home-logo/.nav-logo, sized like the desktop bar's
+   own 32px (this header isn't squeezed to ~49px total height the way the
+   home page's tap-to-reveal header is, so there's room). */
+.mobile-auth-logo {
+	height: 32px;
+	width: auto;
+}
+
+/* Home-page header/footer only (mindex.jsp's `data-tap-toggle="true"`,
+   unlike every other page's header - MobilePage - which is always
+   visible): hidden by default, faded in by MobileImageViewer's `onTap`
+   toggling `controlsVisible` in MobileApp. `pointer-events: none` while
+   hidden, not just `opacity: 0`, so an invisible button can't still
+   swallow a tap meant for the picture underneath it. z-index (4) sits
+   above the picture content but *below* .mobile-side-panel's own (5) -
+   found and fixed the same day it was first set the other way around:
+   putting the header/footer on top hid the panel's own "Back" button
+   entirely (the header spans the full screen width, covering the panel's
+   top-left corner where Back sits, not just the strip actually showing
+   Menu/Quit). Below (.shifted) the whole bar - Menu/Go *and* Quit/Edit
+   together - translates right by the same amount as .mobile-home-content,
+   so Quit/Edit end up pushed off the right edge of the screen while a
+   panel is open, not left reachable there - explicit ask, 24/09/2026 (a
+   reversal of an earlier 23/09/2026 choice that kept them in place; see
+   .shifted's own comment below for why that didn't hold up in landscape). */
+.mobile-home-header,
+.mobile-home-footer {
+	position: absolute;
+	left: 0;
+	right: 0;
+	z-index: 4;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.6rem 1rem;
+	/* 20% transparent (explicit ask, 03/09/2026, all mobile devices) - an
+	   alpha channel on the background color itself, not this element's own
+	   `opacity` below (that one is the show/hide toggle on tap - fading a
+	   bar that's already see-through would just mean it never reads as
+	   fully "there" even once revealed). Buttons/text inside stay fully
+	   opaque either way, since only the background's own alpha changed. */
+	background: rgba(0, 0, 0, 0.8);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.mobile-home-header.visible,
+.mobile-home-footer.visible {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.mobile-home-header {
+	top: 0;
+}
+
+.mobile-home-footer {
+	bottom: 0;
+}
+
+/* Shifts the whole bar right by the panel's own width when a side panel
+   is open - `transform: translateX()`, the same technique and the same
+   variable as .mobile-home-content.shifted, not a `left` offset (a first
+   attempt, 23/09/2026, narrowed the bar via `left` instead - keeping
+   `right: 0` fixed so Quit/Edit stayed put while only Menu/Go revealed.
+   That looked right on a narrow portrait screen, where the panel (capped
+   at 300px) still eats most of the width, squeezing Menu and Quit
+   together into a thin visible strip near the right edge - but on a wide
+   landscape screen the same 300px cap leaves a wide strip where Quit/Edit
+   just sit at their normal position, unmoved: exactly the "the two
+   buttons on the right do not move" bug reported 24/09/2026). `transform`
+   doesn't change this element's own layout box (still left:0; right:0,
+   full width) - it shifts the box and everything laid out inside it as a
+   unit, after layout - so Menu/Go (near the box's own left edge) end up
+   revealed right next to the panel and Quit/Edit (near the box's own
+   right edge) end up pushed off the right edge of the screen, consistent
+   in both orientations. Doesn't require any change to .mobile-home-logo's
+   own `left: 50vw` below - a transformed ancestor still lays out its
+   absolutely-positioned descendants against its own (pre-transform) box
+   first, then carries the whole subtree along with the same translateX,
+   so the banner ends up in exactly the same place either way. */
+.mobile-home-header.shifted,
+.mobile-home-footer.shifted {
+	transform: translateX(var(--mobile-panel-width));
+}
+
+.mobile-auth-header h1,
+.mobile-page-title {
+	margin: 0;
+	font-size: 1.1rem;
+}
+
+/* Same banner as desktop's .nav-logo (explicit ask, 28/08/2026) - dead-
+   center of the header regardless of the Menu/Quit buttons' own widths on
+   either side, same absolute-centering technique. Shorter (22px) than
+   desktop's 32px to fit .mobile-home-header's own smaller (~49px) height
+   with room to spare, width auto to keep the banner's own aspect ratio.
+   `left: 50vw` (23/09/2026, explicit ask - "move the banner right by the
+   same distance" when a side panel is open) still reads correctly now
+   that .mobile-home-header.shifted moved from narrowing via `left` to a
+   `transform: translateX()` (24/09/2026, see that rule's own comment) -
+   the header's own layout box is always the full viewport width (left:0;
+   right:0, untouched by .shifted now), so `50vw` and a plain `50%` would
+   actually agree in both states today; `vw` is kept anyway since it costs
+   nothing and stays correct regardless of what .shifted does to the
+   header's box in the future. A transformed ancestor lays out its
+   absolutely-positioned descendants against its own pre-transform box
+   first, then carries the whole subtree along with the same translateX -
+   so this banner, positioned purely from the header's own untransformed
+   origin, ends up shifted exactly --mobile-panel-width further right
+   automatically, no separate `.shifted` override needed here either way. */
+.mobile-home-logo {
+	position: absolute;
+	left: 50vw;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	height: 22px;
+	width: auto;
+}
+
+.mobile-home-header button,
+.mobile-page-header button,
+.mobile-home-footer button,
+.mobile-side-panel button,
+.mobile-share-popup button {
+	background: transparent;
+	color: rgb(220, 220, 220);
+	border: 1px solid rgb(90, 90, 90);
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+/* MobileSharePopup (25/09/2026, new footer "Share" button) - a small
+   centered popup, not one of the left-anchored MobileSlidePanel screens
+   (Go/Menu are opened from *left* corner buttons and slide in from that
+   edge; Share opens from a *middle* footer button, so a left-anchored
+   panel would be a spatial mismatch here). z-index above both the side
+   panels (5) and the header/footer chrome (4) - nothing technically stops
+   this popup and a side panel being open at once (independent state), so
+   it needs to win regardless. Backdrop and card are CSS siblings in the
+   markup (MobileSharePopup's own doc comment on why), not nested. */
+.mobile-share-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.6);
+	z-index: 6;
+}
+
+.mobile-share-popup {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 7;
+	background: black;
+	border: 1px solid rgb(90, 90, 90);
+	border-radius: 8px;
+	padding: 1rem;
+	width: min(85vw, 320px);
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+}
+
+/* The two share-action buttons fill the popup's own width (matching
+   .mobile-panel-list button's same "full-width, not just as wide as its
+   own label" convention) - overridden back down for the close button
+   specifically below, which reads better small and right-aligned. */
+.mobile-share-popup button {
+	width: 100%;
+	justify-content: center;
+}
+
+.mobile-share-close {
+	width: auto !important;
+	align-self: flex-end;
+	padding: 0.3rem 0.6rem;
+	font-size: 0.85rem;
+}
+
+/* Non-error confirmation (the Web Share API's absence fallback only -
+   copying to the clipboard has no OS-level feedback of its own the way
+   handing off to the share sheet does, so this is the only visible sign
+   anything happened) - a light green suited to this popup's own black
+   background, not .backup-status-ok's darker green (tuned for a white
+   Admin surface instead). */
+.mobile-share-status {
+	color: rgb(134, 239, 172);
+	margin: 0;
+}
+
+.mobile-icon {
+	width: 1.1em;
+	height: 1.1em;
+	flex-shrink: 0;
+}
+
+.mobile-auth-content {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1rem;
+}
+
+.mobile-auth-form {
+	width: 100%;
+	max-width: 320px;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	background: black;
+	padding: 2rem;
+	border-radius: 8px;
+	box-shadow: -3px 6px 10px #111;
+}
+
+.mobile-auth-form label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.9rem;
+}
+
+.mobile-auth-footer {
+	text-align: center;
+	padding: 0.5rem;
+	color: rgb(150, 150, 150);
+	flex-shrink: 0;
+}
+
+.mobile-home-content {
+	/* The only normal-flow child of .mobile-home-main now that the header/
+	   footer overlay it instead of sitting in their own row - full height,
+	   not flex:1 shared with two chrome bars. */
+	position: relative;
+	height: 100%;
+	width: 100%;
+	transition: transform 0.2s ease;
+}
+
+/* Shifted right by the open side panel's own width (explicit ask,
+   28/08/2026) - stays at full size rather than shrinking to fit the
+   remaining space (the old flex-push behavior, which squeezed/distorted
+   the image, worst in portrait). The overflowing right portion is simply
+   clipped by .mobile-home-main's own `overflow: hidden`, not resized -
+   the explicitly preferred trade-off here. See MobileSlidePanel.jsx. */
+.mobile-home-content.shifted {
+	transform: translateX(var(--mobile-panel-width));
+}
+
+/* Positioned below .mobile-home-header (Menu/Quit), not at the shared
+   .postit default's top:20px - explicit ask. .mobile-home-header and this
+   postit share the same positioning ancestor (.mobile-home-content's
+   sibling .mobile-home-main), so both measure `top` from the same origin;
+   the header's own rendered height is ~49px (icon + text + padding), 60px
+   clears it with a small gap, same spirit as the desktop gap below
+   .controls-bar (ImageViewer.jsx). */
+.mobile-home-content .postit {
+	top: 60px;
+}
+
+/* MobileShareScreen's own content wrapper (02/09/2026) - `.mobile-auth-page`
+   is a flex column with a definite height (100dvh); this just claims the
+   space left below `.mobile-auth-header` so `.mobile-photoframe`'s own
+   `height: 100%` has a real, non-zero ancestor height to fill, the same way
+   `.mobile-home-main`'s flex chain does for MobileApp's own MobileImageViewer. */
+.mobile-share-content {
+	flex: 1;
+	min-height: 0;
+	position: relative;
+}
+
+.mobile-photoframe {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: black;
+	overflow: hidden;
+	/* pan-y (not pan-x): a horizontal drag stays native-gesture-free so
+	   MobileImageViewer's own touchstart/touchend can read it as a swipe;
+	   pinch-zoom is listed explicitly - `touch-action` is a restriction
+	   list, so leaving it out here would have silently blocked the native
+	   pinch-to-zoom the viewport meta tag (index.html) just enabled. */
+	touch-action: pan-y pinch-zoom;
+}
+
+.mobile-photoframe-empty p {
+	color: rgb(150, 150, 150);
+}
+
+.mobile-visible-image {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+}
+
+/* Mosaic screen (MobileMosaicView, 09/09/2026, explicit ask) - fills the
+   same .mobile-home-content slot MobileImageViewer's own .mobile-photoframe
+   does, one or the other rendered at a time (MobileApp's own viewMode).
+   Unlike .mobile-photoframe, `touch-action: none` - no native pinch-zoom or
+   panning to leave room for here (there's no single image to zoom, and
+   paging between mosaic pages is a fully custom horizontal transform, not
+   native scrolling), so nothing needs to be carved out of the restriction
+   list the way pinch-zoom/pan-y are on .mobile-photoframe. No top/bottom
+   padding reserved for the header/footer (unlike an earlier version of this
+   rule) - that chrome is double-tap-to-reveal on this screen now, same as
+   the single-image screen (09/09/2026, fixing a report that double-tap
+   "does not work in the mosaic screen" - it had no way to work at all, the
+   chrome was unconditionally always-visible here until this fix), so it
+   overlays transiently instead of needing permanent clearance. */
+.mobile-mosaic {
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	touch-action: none;
+	background: rgb(25, 25, 25);
+}
+
+.mobile-mosaic-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.mobile-mosaic-empty p {
+	color: rgb(150, 150, 150);
+}
+
+/* One full-width "page" per child (`flex: 0 0 100%` - grow/shrink both
+   disabled so every page stays exactly the track's own available width,
+   rather than being squeezed to fit them all into one), translated by whole
+   page widths via MobileMosaicView's own inline `transform` - same
+   translateX-a-flex-child technique already used for the side panels
+   (MobileSlidePanel/.mobile-side-panel), just horizontal instead of a
+   single open/closed state. */
+.mobile-mosaic-track {
+	display: flex;
+	height: 100%;
+	transition: transform 0.25s ease;
+}
+
+.mobile-mosaic-page {
+	flex: 0 0 100%;
+	display: flex;
+	flex-direction: column;
+	/* Vertically centers the block of active rows when a page has fewer
+	   rows than rowsPerPage (explicit ask, 09/09/2026) - e.g. the last page
+	   of a sequence that doesn't divide evenly, or a whole sequence short
+	   enough to need only 1-2 rows at all. When a page *is* full
+	   (rows === rowsPerPage), its rows already add up to exactly this
+	   element's own height (MobileMosaicView's own rowHeight math), so
+	   there's no leftover space to center into either way - `center`
+	   naturally behaves like top-aligned there too, no separate case
+	   needed for "all rows active -> pinned to the top edge". Height comes
+	   from `align-items: stretch` (the default) on .mobile-mosaic-track,
+	   its own flex parent - not set explicitly here. */
+	justify-content: center;
+	gap: 4px;
+}
+
+.mobile-mosaic-row {
+	display: flex;
+	gap: 4px;
+}
+
+/* Every thumbnail carries the same 4px border always (transparent normally,
+   white for the current image - explicit ask) rather than only the current
+   one growing a border on selection - the same "border always present, only
+   its color changes" trick .focusThumb/.noFocusThumb already use for the
+   desktop filmstrip, so a tap that moves the white frame never nudges every
+   thumbnail's own box size by a few pixels in the process (`box-sizing:
+   border-box`, the global default, keeps this element's own width/height -
+   MobileMosaicView's own computed style - the *outer* size regardless of
+   which border color is showing). */
+.mobile-mosaic-thumb {
+	box-sizing: border-box;
+	border: 4px solid transparent;
+	overflow: hidden;
+	flex-shrink: 0;
+	cursor: pointer;
+	position: relative;
+}
+
+.mobile-mosaic-thumb-current {
+	border-color: #fff;
+}
+
+.mobile-mosaic-thumb-img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* Not-yet-visible thumbnails (MobileMosaicView's own `visibleImageIds`,
+   10/09/2026 - only the current page ± 1 actually mounts an AuthImage) fall
+   back to a plain `<div>` sharing this same class - a slightly lighter fill
+   than .mobile-mosaic's own background so an unloaded slot reads as "empty,
+   waiting" rather than a hole in the grid. Element-type-scoped (`div.`, not
+   just `.mobile-mosaic-thumb-img`) so it never paints behind a real,
+   already-loaded `<img>` sharing the class. */
+div.mobile-mosaic-thumb-img {
+	background: rgb(45, 45, 45);
+}
+
+/* Side panels (#nav-panel/#menu-panel) - absolutely positioned over
+   .mobile-home-main, sliding in via `transform` rather than animating
+   `width` (reversed 28/08/2026, explicit ask - see MobileSlidePanel's own
+   comment). z-index 5: above both .mobile-home-content (the picture, which
+   shifts out from under it) *and* the header/footer chrome (4) - found and
+   fixed the same day it was set the other way around, which hid the
+   panel's own "Back" button under the (full-width, opaque) header. Width
+   is now constant (not itself animated), so the inner div can simply
+   match it at 100% - no risk of content reflow mid-transition, since only
+   `transform` moves. */
+.mobile-side-panel {
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	z-index: 5;
+	width: var(--mobile-panel-width);
+	overflow: hidden;
+	background: black;
+	transform: translateX(-100%);
+	transition: transform 0.2s ease;
+}
+
+.mobile-side-panel.open {
+	transform: translateX(0);
+}
+
+.mobile-side-panel-inner {
+	width: 100%;
+	height: 100%;
+	box-sizing: border-box;
+	padding: 1rem;
+	overflow-y: auto;
+	color: rgb(220, 220, 220);
+}
+
+/* Forbidden-access (or any other) error shown inside the nav panel itself
+   while it's open (13/09/2026, see MobileNavPanel's own doc comment) -
+   .form-error's red/margin:0 plus just enough bottom margin here to keep
+   it from touching the Back button directly below. */
+.mobile-panel-error {
+	margin-bottom: 1rem;
+}
+
+.mobile-panel-back {
+	margin-bottom: 1rem;
+}
+
+.mobile-panel-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.mobile-panel-list button {
+	width: 100%;
+	text-align: left;
+}
+
+.mobile-panel-current-path {
+	color: rgb(180, 180, 180);
+	font-size: 0.9rem;
+	padding-bottom: 0.5rem;
+	margin-bottom: 0.3rem;
+	border-bottom: 1px solid rgb(70, 70, 70);
+	word-break: break-word;
+}
+
+/* Full-screen pages (#upload-page/#camera-page/#img-edit-page/
+   #dir-edit-page/#query-page) */
+.mobile-page-content {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.mobile-page-content label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+}
+
+.mobile-page-content textarea,
+.mobile-page-content input,
+.mobile-page-content select {
+	padding: 0.5rem;
+	font-size: 1rem;
+	border: 1px solid #666;
+	border-radius: 4px;
+	background: rgb(40, 40, 40);
+	color: rgb(220, 220, 220);
+}
+
+.mobile-attribute-checklist {
+	border: 1px solid #555;
+	border-radius: 4px;
+	padding: 0.5rem 0.75rem;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+}
+
+.mobile-hidden-file-input {
+	display: none;
+}
+
+.mobile-selected-files {
+	margin: 0;
+	color: rgb(150, 150, 150);
+	font-size: 0.9rem;
+}
+
+/*************************************
+** Mobile UI on tablets (03/09/2026, explicit ask) - this app's device
+** detection (deviceDetection.js) is User-Agent based, not screen-size
+** based (Design.md decision #9's own reasoning: phone vs. tablet differ
+** by more than screen real estate here - no keyboard shortcuts, reduced
+** edit forms, native camera capture - none of that changes just because
+** the glass is bigger), so a 10-12" Android/iOS tablet already gets this
+** same mobile presentation, not the desktop one - confirmed fine as a
+** presentation choice ("Mobile UI is fine with smartphone"), just too
+** small a touch target/read size on the extra screen real estate a
+** tablet actually has. A plain `min-width` breakpoint layered on top,
+** scoped to the specific elements named, rather than a second device-
+** detection path - 700px comfortably clears real smartphones (6-7",
+** ~390-500px CSS width even landscape-rotated at the top end) without
+** waiting for a full 768/1024px "classic tablet" breakpoint most 10"+
+** tablets already exceed in portrait too.
+*************************************/
+@media (min-width: 700px) {
+	/* The four always-in-a-corner buttons (Menu/Quit/Go/Edit -
+	   .mobile-home-header/.mobile-home-footer only, not every mobile
+	   button - .mobile-page-header's own Home/Quit on the full-screen sub-
+	   pages, and .mobile-panel-list's own menu entries just below, are
+	   each handled on their own terms right after this). Full +50% on
+	   both padding axes (not just height) - these read as compact pill
+	   buttons, meant to grow as a whole, unlike the menu list below whose
+	   own width was explicitly called out as already correct. */
+	.mobile-home-header button,
+	.mobile-home-footer button {
+		padding: 0.6rem 1.35rem;
+		font-size: 1.5em;
+	}
+
+	/* Main menu (#menu-panel, .mobile-panel-list) - width explicitly left
+	   alone (already correct per the ask), only vertical padding grows -
+	   .mobile-panel-list button's own width:100% means the column's total
+	   width is set by .mobile-side-panel's own --mobile-panel-width
+	   variable, untouched here. .mobile-panel-back (the nav panel's own
+	   "Back"/"Retour" button, above this same list - MobileNavPanel.jsx) is
+	   a separate class, not a `.mobile-panel-list button` itself, so it was
+	   missed here initially (found live, 09/09/2026: every other button
+	   grew except this one) - same treatment now, for the same reason:
+	   neither class sets its own padding/font-size outside this block (both
+	   otherwise fall back to the browser's plain default button sizing), so
+	   both need the same explicit tablet-only values, not a scale-up of an
+	   explicit base that doesn't exist. */
+	.mobile-panel-list button,
+	.mobile-panel-back {
+		padding-top: 0.6rem;
+		padding-bottom: 0.6rem;
+		font-size: 1.5em;
+	}
+
+	/* Banner - height alone is set today (width:auto keeps its own aspect
+	   ratio), so scaling height by 1.5 already grows both dimensions in
+	   proportion, exactly "50% in both directions" for an aspect-locked
+	   image. */
+	.mobile-home-logo {
+		height: 33px;
+	}
+}
+
+/*************************************
+** Mobile UI in landscape (03/09/2026, explicit ask - "the address and
+** tool bars of the navigator take too much space [...] the application
+** forces the full screen mode and lays out all its UI elements on the
+** totality of the screen"). Two separate mechanisms, deliberately:
+**
+** 1. The actual browser chrome (address/tool bars) is reclaimed by
+**    `useLandscapeFullscreen` (mobile/useLandscapeFullscreen.js), not by
+**    anything here - no CSS on this page can give back space a browser
+**    is occupying *outside* the page. That hook arms itself in landscape
+**    and goes fullscreen on the next tap (a real user gesture is required
+**    by every browser to grant it - can't fire on rotation alone).
+** 2. MobileApp's own home screen (the picture/postit) already uses the
+**    *page's* full height in every orientation - .mobile-home-header/
+**    -footer are `position: absolute` overlays, tap-to-reveal, never
+**    claiming their own row (see .mobile-home-main's own comment) - so it
+**    needs nothing here. What DOES claim a permanent row today is the
+**    *other* mobile pages' header (.mobile-page-header/.mobile-auth-
+**    header, always visible - Search/Upload/Camera/Movie/edit forms/
+**    sign-in) - this block only shrinks those, reclaiming a few of the
+**    now-scarcer vertical pixels landscape leaves after the browser
+**    chrome (fullscreen or not).
+*************************************/
+@media (orientation: landscape) {
+	.mobile-page-header {
+		padding: 0.35rem 1rem;
+	}
+
+	/* Stacked (banner above title) in portrait, where height is abundant;
+	   side by side here instead - same two children, same source order
+	   (img then h1), just a flex-direction switch, no markup change. */
+	.mobile-auth-header {
+		flex-direction: row;
+		padding: 0.4rem 1rem;
+		gap: 0.75rem;
+	}
+
+	.mobile-auth-logo {
+		height: 24px;
+	}
+
+	.mobile-auth-header h1,
+	.mobile-page-title {
+		font-size: 1rem;
+	}
+}
+
+/* Warning variant of .copy-feedback (04/10/2026) - a shared search result
+   cut at the app-wide maximum: still a success (the link is copied), but
+   the sharer must know only part of the result went out. */
+.share-warning {
+	color: rgb(240, 200, 90);
+	margin: 0;
+}

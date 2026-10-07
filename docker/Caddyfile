@@ -1,0 +1,45 @@
+# myPhotoDiary web server. The {$...} values are set by entrypoint.sh from
+# the container's settings (MPD_DOMAIN, MPD_HTTPS, MPD_LOCAL_HOSTNAMES,
+# MPD_ACME_EMAIL) - see the comments there. Same routing as the Apache site
+# in the Installation Guide (§4.2).
+{
+	{$CADDY_GLOBAL_OPTIONS}
+	admin off
+	# The local certificate authority (no MPD_DOMAIN) can't be added to the
+	# container's own trust store - and it's the browsers' trust that
+	# matters, not the container's.
+	skip_install_trust
+}
+
+{$CADDY_SITE_ADDRESS} {
+	{$CADDY_TLS}
+	encode zstd gzip
+
+	# Link-preview robots of messaging apps never run JavaScript, so only
+	# the backend can give them the real photo of a share link (og:image).
+	@linkPreview {
+		header_regexp User-Agent (?i)(WhatsApp|facebookexternalhit|Twitterbot|TelegramBot|Slackbot|LinkedInBot|Discordbot|SkypeUriPreview)
+		path_regexp ^/share/(image|sequence|search)/
+	}
+	handle @linkPreview {
+		reverse_proxy 127.0.0.1:8081
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8081
+	}
+
+	# The web app. Share links (/share/...) are the only client-side route:
+	# they have no file of their own and get the app's index.html.
+	handle {
+		root * /opt/myphotodiary/frontend
+		@shareLink path /share/*
+		rewrite @shareLink /index.html
+		file_server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

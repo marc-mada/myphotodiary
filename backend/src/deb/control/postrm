@@ -1,0 +1,21 @@
+#!/bin/sh
+# Deliberately does NOT remove /var/lib/myphotodiary-backend on purge - real
+# family photos/videos/database live there, and an irreversible `apt purge`
+# silently deleting them is a much worse failure mode than leaving disk space
+# behind for the admin to reclaim by hand once they're sure.
+set -e
+
+case "$1" in
+	purge)
+		systemctl daemon-reload >/dev/null 2>&1 || true
+		if [ -d /var/lib/myphotodiary-backend ]; then
+			echo "myphotodiary-backend: package purged. Real data (database, images, staging) was deliberately left at /var/lib/myphotodiary-backend - remove it yourself if you're sure, e.g.:"
+			echo "  sudo rm -rf /var/lib/myphotodiary-backend"
+		fi
+		;;
+	remove)
+		systemctl daemon-reload >/dev/null 2>&1 || true
+		;;
+esac
+
+exit 0

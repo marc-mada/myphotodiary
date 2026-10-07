@@ -1,0 +1,13 @@
+Package: myphotodiary-frontend
+Version: [[version]]-1
+Section: web
+Priority: optional
+Architecture: all
+Recommends: caddy | apache2 | nginx-full | nginx-light | nginx
+Maintainer: Marc Lamberton <321042643+marc-mada@users.noreply.github.com>
+Description: myPhotoDiary frontend (static build)
+ Static React/Vite build for the myPhotoDiary family photo/video diary -
+ installs to /opt/myphotodiary/frontend-dist. Meant to be served by a
+ web server (Caddy recommended) that also forwards /api to the separate
+ myphotodiary-backend package's own service - this package carries no
+ server of its own.

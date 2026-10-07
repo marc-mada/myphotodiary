@@ -1,0 +1,11 @@
+{
+  "name": "myPhotoDiary",
+  "short_name": "myPhotoDiary",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#191919",
+  "theme_color": "#000000",
+  "icons": [
+    { "src": "/legacy/mpd.png", "sizes": "128x128", "type": "image/png" }
+  ]
+}

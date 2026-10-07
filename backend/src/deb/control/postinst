@@ -1,0 +1,93 @@
+#!/bin/sh
+# myphotodiary-backend postinst (01/09/2026) - creates the dedicated system
+# user/group and the default /var/lib data directories so the service is
+# actually usable right after `apt install`, without requiring the admin to
+# invent paths from scratch first (see myphotodiary-backend.env.example's
+# own comments for how to point this at a different disk/partition instead).
+set -e
+
+case "$1" in
+	configure)
+		if ! getent passwd myphotodiary >/dev/null 2>&1; then
+			adduser --system --group --home /var/lib/myphotodiary-backend --no-create-home \
+				--disabled-login --gecos "myPhotoDiary backend service" myphotodiary
+		fi
+
+		mkdir -p /var/lib/myphotodiary-backend/db /var/lib/myphotodiary-backend/images /var/lib/myphotodiary-backend/staging
+		chown -R myphotodiary:myphotodiary /var/lib/myphotodiary-backend
+
+		# The env file itself is owned/installed as myphotodiary:myphotodiary
+		# by the package's own data mapping, but that user didn't exist at
+		# unpack time on a first install - fixed up here now that it does.
+		chown myphotodiary:myphotodiary /etc/myphotodiary-backend/myphotodiary-backend.env
+		chmod 640 /etc/myphotodiary-backend/myphotodiary-backend.env
+
+		systemctl daemon-reload >/dev/null 2>&1 || true
+
+		# Real failure hit live (04/09/2026, production cutover): the
+		# unit's own ExecStart deliberately uses /usr/bin/java (not a
+		# hardcoded JDK path - see that file's own comment on why a
+		# fixed path isn't portable across servers) - but /usr/bin/java
+		# resolves through update-alternatives, and a server can easily
+		# have more than one JDK registered with an *older* one set as
+		# the active default (confirmed: this exact scenario, on a real
+		# production box that already had a stray Java 11 taking
+		# precedence over the 21 this app actually needs) - the service
+		# then dies almost instantly on every start attempt (a JVM
+		# version mismatch fails before Spring even gets a chance to
+		# log anything), which systemd reports only as the opaque
+		# "Start request repeated too quickly" - no indication anywhere
+		# of *why*. Checked here, once, right after install, with a
+		# clear message and the actual fix - not left for the admin to
+		# discover by reading `journalctl` stack traces cold.
+		if command -v /usr/bin/java >/dev/null 2>&1; then
+			java_version_line=$(/usr/bin/java -version 2>&1 | head -1)
+			java_major=$(echo "$java_version_line" | sed -n 's/.*version "\([0-9]*\)\(\.[0-9]*\)*.*/\1/p')
+			# Pre-Java-9 version strings are "1.8.0_392" etc. - the sed
+			# above captures the leading "1", which on its own would
+			# read as "newer than every real major version" to a plain
+			# numeric -lt comparison; normalized to the actual major
+			# version (8) instead, always too old regardless.
+			if [ "$java_major" = "1" ]; then
+				java_major=8
+			fi
+			if [ -z "$java_major" ] || [ "$java_major" -lt 21 ] 2>/dev/null; then
+				echo "myphotodiary-backend: WARNING - /usr/bin/java resolves to Java ${java_major:-an unrecognized version} ($java_version_line), but this service needs 21+."
+				echo "  This server likely has more than one JDK installed, with an older one set as the active alternative."
+				echo "  Fix: sudo update-alternatives --config java   (pick the 21.x entry), then:"
+				echo "  sudo systemctl restart myphotodiary-backend"
+			fi
+		fi
+
+		missing_secret=""
+		if ! grep -q '^MPD_VIDEO_TOKEN_SECRET=.\+' /etc/myphotodiary-backend/myphotodiary-backend.env 2>/dev/null; then
+			missing_secret="MPD_VIDEO_TOKEN_SECRET $missing_secret"
+		fi
+		if ! grep -q '^MPD_SHARE_TOKEN_SECRET=.\+' /etc/myphotodiary-backend/myphotodiary-backend.env 2>/dev/null; then
+			missing_secret="MPD_SHARE_TOKEN_SECRET $missing_secret"
+		fi
+		if [ -n "$missing_secret" ]; then
+			echo "myphotodiary-backend: not started automatically - still empty: $missing_secret"
+			echo "  1. openssl rand -hex 32   (run once per secret listed above - do not reuse the same value for both)"
+			echo "  2. Paste each into its own line in /etc/myphotodiary-backend/myphotodiary-backend.env"
+			echo "  3. sudo systemctl enable --now myphotodiary-backend"
+		fi
+
+		# Backup feature (18/09/2026) - the image-tree half's timer is safe
+		# to always enable, unlike the main service above: backup-images.sh
+		# refuses to actually write anything (BackupMountGuard's own shell
+		# equivalent) until MPD_BACKUP_ROOT points at a real mounted
+		# filesystem, so enabling this before that's set up just means it
+		# runs daily, no-ops cleanly, and says so in its own logs/status.json
+		# - never a silent false "it's backed up".
+		systemctl enable --now myphotodiary-backend-backup.timer >/dev/null 2>&1 || true
+
+		if ! grep -q '^MPD_BACKUP_ROOT=.\+' /etc/myphotodiary-backend/myphotodiary-backend.env 2>/dev/null; then
+			echo "myphotodiary-backend: NOTE - MPD_BACKUP_ROOT is not set, so backups are enabled but currently doing nothing (by design, not an error - see that file's own comment)."
+			echo "  Once you have a backup target mounted, set MPD_BACKUP_ROOT in /etc/myphotodiary-backend/myphotodiary-backend.env and restart:"
+			echo "  sudo systemctl restart myphotodiary-backend myphotodiary-backend-backup.timer"
+		fi
+		;;
+esac
+
+exit 0

@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.5.16</version>
+		<relativePath/>
+	</parent>
+
+	<groupId>org.myphotodiary</groupId>
+	<artifactId>myphotodiary-backend</artifactId>
+	<version>2.10.2</version>
+	<packaging>jar</packaging>
+
+	<!-- Real bug found inspecting the built .deb's own control file
+	     (04/09/2026): without an explicit <url> here, Maven's own POM
+	     inheritance rule for <url> (not a jdeb quirk) appends this child's
+	     artifactId onto the <parent>'s own <url> when none is set -
+	     spring-boot-starter-parent's "https://spring.io/projects/spring-boot"
+	     became "https://spring.io/projects/spring-boot/myphotodiary-backend"
+	     in the shipped package's Homepage field (jdeb's DebMojo passes
+	     project.getUrl() straight through - the append happens in Maven's own
+	     model inheritance, before jdeb ever sees it). An explicit <url> here
+	     overrides that inheritance outright. -->
+	<url>https://github.com/marc-mada/myphotodiary</url>
+
+	<properties>
+		<java.version>21</java.version>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<!-- Flyway's HSQLDB support lives in a separate module since Flyway 9 -->
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-hsqldb</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.hsqldb</groupId>
+			<artifactId>hsqldb</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<!-- Replaces the legacy hand-rolled Java2D resize + manual EXIF-rotation
+		     code (Design.md §16.7) - reads EXIF orientation and bakes it into
+		     the pixels it writes, so nothing downstream needs to re-apply it. -->
+		<dependency>
+			<groupId>net.coobird</groupId>
+			<artifactId>thumbnailator</artifactId>
+			<version>0.4.20</version>
+		</dependency>
+		<!-- Same EXIF library the legacy DirectoryIndexer/ImportSvr use
+		     (com.drew.metadata.* - Design.md §16.7) - ported faithfully rather
+		     than approximated, see ExifDateReader. -->
+		<dependency>
+			<groupId>com.drewnoakes</groupId>
+			<artifactId>metadata-extractor</artifactId>
+			<version>2.18.0</version>
+		</dependency>
+
+		<!-- Test-scope only (01/09/2026) - metadata-extractor above is
+		     read-only, so ExifDateReaderTest needs a way to actually write a
+		     real EXIF DateTime (0x0132) tag into a fixture JPEG rather than
+		     hand-rolling TIFF/EXIF bytes, to prove the new fallback in
+		     ExifDateReader really reads it - the same "real fixture, not a
+		     hand-waved one" discipline already used for the video import
+		     tests (real ffmpeg-generated H.264 files, not bytes with a .mp4
+		     extension stuck on). Never on the runtime classpath/shipped jar. -->
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-imaging</artifactId>
+			<version>1.0.0-alpha6</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<executions>
+					<!-- META-INF/build-info.properties -> BuildProperties bean:
+					     the running jar's own version, served by VersionController
+					     (Admin -> Configure shows it, 26/09/2026). -->
+					<execution>
+						<goals>
+							<goal>build-info</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<!-- Runs LegacyDataImporter's own main() from the terminal
+			     (28/08/2026, legacy->new-stack HSQLDB data migration tool -
+			     see that class's own javadoc) - `mvn exec:java` picks up this
+			     module's own compiled classes plus its Maven dependencies
+			     (HSQLDB's JDBC driver in particular) automatically, without
+			     needing to hand-assemble a classpath or fight a Spring Boot
+			     repackaged fat jar's nested-jar classloading for a plain
+			     one-off JDBC tool that has nothing to do with the app itself. -->
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>3.5.0</version>
+			</plugin>
+		</plugins>
+	</build>
+
+	<profiles>
+		<!--
+		  `mvn package -P deb` (01/09/2026) - builds target/myphotodiary-backend_
+		  ${project.version}-1_all.deb. jdeb is a pure-Java implementation (no
+		  dpkg-deb/fakeroot needed) - builds cleanly on this dev Mac, not only
+		  on a real Debian/Ubuntu box.
+
+		  Deliberately ships generic /var/lib defaults (src/deb/myphotodiary-
+		  backend.env.example, installed as the real, editable
+		  /etc/myphotodiary-backend/myphotodiary-backend.env conffile) rather
+		  than any one server's real paths - real server details don't belong
+		  in a tracked file. The systemd unit reads
+		  every MPD_* value from that one EnvironmentFile rather than having
+		  them baked into the unit itself, specifically so upgrading the
+		  package (which reinstalls the packaged files) never touches an
+		  admin's own real values - only the unit and the jar get replaced,
+		  the conffile survives (dpkg's own standard conffile handling).
+		-->
+		<profile>
+			<id>deb</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.vafer</groupId>
+						<artifactId>jdeb</artifactId>
+						<version>1.10</version>
+						<executions>
+							<execution>
+								<phase>package</phase>
+								<goals>
+									<goal>jdeb</goal>
+								</goals>
+								<configuration>
+									<controlDir>${project.basedir}/src/deb/control</controlDir>
+									<deb>${project.build.directory}/myphotodiary-backend_${project.version}-1_all.deb</deb>
+									<dataSet>
+										<!-- The repackaged Spring Boot fat jar - the one real
+										     deployable artifact, - see docs/Design.md §13. -->
+										<data>
+											<src>${project.build.directory}/${project.build.finalName}.jar</src>
+											<type>file</type>
+											<mapper>
+												<type>perm</type>
+												<prefix>/usr/share/myphotodiary-backend</prefix>
+												<filemode>644</filemode>
+												<user>root</user>
+												<group>root</group>
+											</mapper>
+											<dst>myphotodiary-backend.jar</dst>
+										</data>
+										<data>
+											<src>${project.basedir}/src/deb/myphotodiary-backend.service</src>
+											<type>file</type>
+											<mapper>
+												<type>perm</type>
+												<prefix>/lib/systemd/system</prefix>
+												<filemode>644</filemode>
+												<user>root</user>
+												<group>root</group>
+											</mapper>
+										</data>
+										<!-- Backup feature (18/09/2026) - the DB half runs inside
+										     the jar itself (DatabaseBackupService's own @Scheduled),
+										     these two units are only for the image-tree half
+										     (backup-images.sh, below) - see that script's own comment
+										     for why it's a separate systemd-timer-scheduled process
+										     rather than backend Java code. -->
+										<data>
+											<src>${project.basedir}/src/deb/myphotodiary-backend-backup.service</src>
+											<type>file</type>
+											<mapper>
+												<type>perm</type>
+												<prefix>/lib/systemd/system</prefix>
+												<filemode>644</filemode>
+												<user>root</user>
+												<group>root</group>
+											</mapper>
+										</data>
+										<data>
+											<src>${project.basedir}/src/deb/myphotodiary-backend-backup.timer</src>
+											<type>file</type>
+											<mapper>
+												<type>perm</type>
+												<prefix>/lib/systemd/system</prefix>
+												<filemode>644</filemode>
+												<user>root</user>
+												<group>root</group>
+											</mapper>
+										</data>
+										<!-- Backup/restore scripts (18/09/2026) - installed as plain
+										     executable files, root:root (consistent with the jar/
+										     units above - nothing here should be writable by the
+										     myphotodiary service account itself). backup-images.sh is
+										     the only one actually run automatically (by the timer
+										     above); restore-db.sh/restore-images.sh are shipped so
+										     they're available on the server without a git checkout at
+										     the moment they're actually needed, but are never wired
+										     to any unit/automation - see their own comments for why
+										     restore specifically stays a manual, supervised action. -->
+										<data>
+											<src>${project.basedir}/src/deb/scripts/backup-images.sh</src>
+											<type>file</type>
+											<mapper>
+												<type>perm</type>
+												<prefix>/usr/share/myphotodiary-backend/scripts</prefix>
+												<filemode>755</filemode>
+												<user>root</user>
+												<group>root</group>
+											</mapper>
+										</data>
+										<data>
+											<src>${project.basedir}/src/deb/scripts/restore-db.sh</src>
+											<type>file</type>
+											<mapper>
+												<type>perm</type>
+												<prefix>/usr/share/myphotodiary-backend/scripts</prefix>
+												<filemode>755</filemode>
+												<user>root</user>
+												<group>root</group>
+											</mapper>
+										</data>
+										<data>
+											<src>${project.basedir}/src/deb/scripts/restore-images.sh</src>
+											<type>file</type>
+											<mapper>
+												<type>perm</type>
+												<prefix>/usr/share/myphotodiary-backend/scripts</prefix>
+												<filemode>755</filemode>
+												<user>root</user>
+												<group>root</group>
+											</mapper>
+										</data>
+										<!-- The directory itself, created explicitly with normal
+										     root:root/0755 ownership - found live in this build's
+										     own first test (inspecting the real archive, not
+										     assumed): without this, jdeb applies the env file's own
+										     mapper (myphotodiary:myphotodiary) to every parent
+										     directory it has to create, including /etc itself - a
+										     shared system directory that must never end up owned by
+										     a service account. Listed before the file entry below so
+										     the directory already exists (correctly owned) by the
+										     time that entry's own mapper only needs to touch the file. -->
+										<data>
+											<type>template</type>
+											<paths>
+												<path>etc/myphotodiary-backend</path>
+											</paths>
+											<mapper>
+												<type>perm</type>
+												<filemode>755</filemode>
+												<user>root</user>
+												<group>root</group>
+											</mapper>
+										</data>
+										<!-- Installed as the real conffile path directly (not
+										     "*.example") - dpkg's own conffile mechanism is what
+										     protects an admin's edited values across upgrades; a
+										     same-named "-.example" copy would need the admin to
+										     notice and copy it over themselves instead. -->
+										<data>
+											<src>${project.basedir}/src/deb/myphotodiary-backend.env.example</src>
+											<type>file</type>
+											<mapper>
+												<type>perm</type>
+												<prefix>/etc/myphotodiary-backend</prefix>
+												<filemode>640</filemode>
+												<user>myphotodiary</user>
+												<group>myphotodiary</group>
+											</mapper>
+											<dst>myphotodiary-backend.env</dst>
+										</data>
+									</dataSet>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+</project>

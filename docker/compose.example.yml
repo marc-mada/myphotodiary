@@ -1,0 +1,42 @@
+# myPhotoDiary with Docker Compose - an alternative to the `docker run`
+# command in the Installation Guide (Docker chapter), with the same
+# settings. Copy this file as compose.yml into a folder of your choice,
+# create a .env file next to it with your own values, for example:
+#
+#   MPD_DOMAIN=photos.example.com
+#   MPD_ACME_EMAIL=you@example.com
+#   MPD_INITIAL_ADMIN_PASSWORD=choose-a-strong-one
+#   MPD_DATA=/srv/myphotodiary
+#   MPD_UID=1000
+#   MPD_GID=1000
+#   TZ=Europe/Paris
+#
+# then: docker compose up -d   (logs: docker compose logs -f)
+
+services:
+  myphotodiary:
+    image: ghcr.io/marc-mada/myphotodiary:2.10.2
+    container_name: myphotodiary
+    restart: unless-stopped
+    # The user that owns the data folder on this machine (see the guide).
+    user: "${MPD_UID:-10001}:${MPD_GID:-10001}"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      TZ: ${TZ:-UTC}
+      MPD_DOMAIN: ${MPD_DOMAIN:-}
+      MPD_ACME_EMAIL: ${MPD_ACME_EMAIL:-}
+      MPD_INITIAL_ADMIN_PASSWORD: ${MPD_INITIAL_ADMIN_PASSWORD:-}
+    volumes:
+      - ${MPD_DATA:-./data}:/data
+      # Optional: a NAS share or second disk for backups, mounted on this
+      # machine first (see the guide's Backup chapter):
+      # - /mnt/myphotodiary-backup:/data/backup
+    mem_limit: 2g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,63 @@
+# Build output
+target/
+*.class
+
+# IDE
+.classpath
+.project
+.settings/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+
+# Local runtime/test scratch (Tomcat installs, HSQLDB data, etc.)
+# if ever recreated under this repo instead of alongside it
+/tomcat*/
+/data/
+
+# backend/: isolated dev HSQLDB (application.yml default, incl. HSQLDB's
+# own .properties/.script/.log/.lck files) - never the shared/real database
+# (HSQLDB in file mode allows one process per database, docs/Design.md
+# decision #4)
+backend/data/
+
+# frontend/ (once it exists)
+frontend/node_modules/
+frontend/dist/
+
+# frontend/: Vite env files - real values only, never committed, same
+# reasoning as backend/data/'s HSQLDB files not being the shared database.
+# No frontend env var is actually required as of 16/09/2026 (the sequence
+# geolocation picker's own VITE_GOOGLE_MAPS_API_KEY was removed when that
+# screen switched to Leaflet/OpenStreetMap, which needs no API key at all)
+# - kept here regardless, ready for whatever real secret a
+# future frontend feature ends up needing.
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# frontend/: mkcert-generated dev-only TLS key/cert (10/09/2026 - LAN HTTPS
+# for the dev server, so secure-context-only APIs like showDirectoryPicker
+# work when reached by IP, not just localhost). The private key in
+# particular must never be committed, same "local-machine secret" reasoning
+# as .env above - regenerable on any machine via mkcert, see
+# frontend/vite.config.js for the exact commands.
+frontend/.certs/
+
+# Local-environment-only migration runbook (real server layout, service
+# names, paths, hostname, TLS cert paths) - the one-time legacy migration
+# record, not something to share even if this repo were ever made public.
+# Kept on disk, tracked nowhere (01/09/2026, explicit - split out of the
+# former single "Operation procedures.md"; the public part of it now lives
+# in docs/Installation Guide.md).
+/Migration Procedure.md
+
+# Internal development notes (15/09/2026, explicit ask): the project's
+# working log and the legacy-code analysis. They contain real production
+# details found along the way, so they stay local-only, same reasoning as
+# Migration Procedure.md above. (docs/Design.md, the architecture
+# reference, is public.)
+/CLAUDE.md
+/ANALYSIS.md

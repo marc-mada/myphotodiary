@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en" translate="no">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Real crash reproduced live (01/09/2026, one Xiaomi/Chrome device) -
+         `Failed to execute 'insertBefore' on 'Node' ... NotFoundError`
+         inside React's own reconciler, caught by the new ErrorBoundary
+         instead of the previous silent black screen. This exact error
+         signature is a well-known consequence of Chrome's built-in page
+         translator rewriting text nodes in place: it mutates the live DOM
+         outside React's control, so the next time React itself tries to
+         update that same subtree (e.g. after navigating into a directory,
+         swapping the picture/postit), it finds a node it still expects to
+         be there already moved/replaced and throws exactly this error -
+         plausible on one specific device if its browser/system language
+         differs from the page's (fr/en/de), auto-triggering translate,
+         while other test devices never did. `translate="no"` (here) plus
+         the meta tag below are the standard opt-out hint Chrome honors to
+         not offer/perform automatic translation of this page - doesn't
+         forbid a user from forcing translation via the browser menu
+         regardless, which is why the ErrorBoundary stays in place either
+         way as the actual safety net. -->
+    <meta name="google" content="notranslate" />
+    <!-- user-scalable/min/max-scale match mindex.jsp's own viewport meta
+         exactly (l.41) - native pinch-zoom, capped at 2x, no zooming out
+         below 100%. Harmless on desktop: this meta tag is a mobile-browser
+         hint that desktop browsers (whose own ctrl+/- zoom is unrelated)
+         simply ignore, so the single shared index.html doesn't need a
+         separate desktop/mobile variant. -->
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=yes,minimum-scale=1.0,maximum-scale=2.0" />
+    <!-- A page in an ordinary browser tab can never hide the address bar
+         itself - no CSS/JS API does that, on any browser, by design (it
+         would let a page fake a URL to phish a user). The only real way to
+         get the picture the full screen, address bar included, is to
+         install the page as a home-screen app and launch it from that
+         icon, not the browser - the exact same thing mindex.jsp was already
+         set up for (l.28/42-43: apple-touch-icon +
+         apple-mobile-web-app-capable, iOS Safari's own way of doing this,
+         predating the standard Web App Manifest). Ported verbatim, plus a
+         manifest.json (display: "standalone") for the equivalent on
+         Android Chrome, which the Apple-only meta tags don't cover.
+         mpd.png is a proper 128x128 icon (supplied 28/08/2026, replacing
+         the legacy source's own 32x32 original at this exact path) - also
+         used as the browser-tab favicon below, not just the home-screen
+         icon. -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/png" href="/legacy/mpd.png" />
+    <link rel="apple-touch-icon" href="/legacy/mpd.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="myPhotoDiary" />
+    <meta name="theme-color" content="#000000" />
+    <title>myPhotoDiary</title>
+    <!-- Boot-loading progress bar (10/09/2026, explicit ask - "on slow 3/4G
+         networks it is lengthy to load the frontend files"). Inline, not in
+         app.css: this has to render *before* app.css itself has downloaded
+         (it's one of the two files this same bar is timing the download
+         of), and match rgb(25,25,25)/rgb(220,220,220) - app.css's own
+         body{} rule for the same reason (no flash-of-different-background
+         once app.css does load and take over). See the bootstrap script
+         at the end of <body> for how the bar itself is driven; in `vite
+         build` output only (viteProgressiveLoaderPlugin, vite.config.js),
+         the real <script type="module">/<link rel="stylesheet"> tags Vite
+         injects just above are rewritten into the inert
+         data-progressive-src/-href markers that script looks for - on the
+         dev server (`npm run dev`, unbundled native ESM, already fast on
+         localhost) those tags are never rewritten, so the script below
+         finds no marker and hides this bar immediately, a deliberate no-op
+         rather than trying to progress-track dozens of individual dev
+         module requests. -->
+    <style>
+      #app-boot-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        background: rgb(25, 25, 25);
+      }
+      .app-boot-loader-banner {
+        max-width: 70vw;
+        height: auto;
+      }
+      .app-boot-loader-track {
+        width: min(280px, 60vw);
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.15);
+        overflow: hidden;
+      }
+      .app-boot-loader-bar {
+        height: 100%;
+        width: 0%;
+        border-radius: 3px;
+        background: rgb(210, 210, 210);
+        transition: width 150ms ease;
+      }
+      .app-boot-loader-bar-indeterminate {
+        width: 40% !important;
+        animation: app-boot-loader-indeterminate 1.2s ease-in-out infinite;
+      }
+      @keyframes app-boot-loader-indeterminate {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(350%);
+        }
+      }
+      /* Same rgb(25,25,25) app.css's own body{} sets (not loaded yet at
+         this point) - avoids a flash of the browser's own default
+         background between this HTML parsing and app.css taking over. */
+      body {
+        margin: 0;
+        background: rgb(25, 25, 25);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app-boot-loader" aria-hidden="true">
+      <img class="app-boot-loader-banner" src="/legacy/photodiary-banner-short.png" alt="" />
+      <div class="app-boot-loader-track">
+        <div id="app-boot-loader-bar" class="app-boot-loader-bar"></div>
+      </div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <!-- Deliberately plain, un-bundled JS (not a .jsx/.js module Vite
+         processes) - it has to run and start fetching before any bundled
+         code exists to do the fetching for it. See the <style> block above
+         for the data-progressive-src/-href contract this reads. -->
+    <script>
+      (function () {
+        var bar = document.getElementById('app-boot-loader-bar');
+        function setProgress(pct) {
+          // Also clears indeterminate mode, not just the width - found live
+          // (10/09/2026): a connection that never exposes a usable
+          // Content-Length for these two assets (e.g. a server that
+          // gzip-compresses them on the fly without a fixed final size to
+          // report, an ordinary and even desirable thing for text assets
+          // like these to do - confirmed against this project's own `vite
+          // preview` server) still finishes normally once the fetch itself
+          // completes; without this, the 100% call below would set the
+          // width but the indeterminate class's own `!important` sweep
+          // animation would keep visually overriding it regardless.
+          if (bar) {
+            bar.classList.remove('app-boot-loader-bar-indeterminate');
+            bar.style.width = pct + '%';
+          }
+        }
+        function setIndeterminate() {
+          if (bar) bar.classList.add('app-boot-loader-bar-indeterminate');
+        }
+        // The one true "loading is over" signal - main.jsx calls this right
+        // after the real app has actually mounted, not tied to any single
+        // resource's own load event (a script tag "finishing" only means
+        // its own bytes arrived and started executing, not that React has
+        // rendered anything yet).
+        window.__hideAppBootLoader = function () {
+          var el = document.getElementById('app-boot-loader');
+          if (el) el.remove();
+        };
+
+        var scriptEl = document.querySelector('script[data-progressive-src]');
+        var linkEl = document.querySelector('link[data-progressive-href]');
+
+        function loadDirectly() {
+          // Real tags, normal browser loading, no progress tracking - the
+          // fallback path (very old browser, the dev server where nothing
+          // was rewritten to begin with, or the fetch-with-progress attempt
+          // below failing outright). If the fetches below already ran to
+          // completion, the browser very likely still has both responses in
+          // its own HTTP cache from moments ago, so this is typically
+          // near-instant rather than a real second download - but correct
+          // either way even if a given server doesn't cooperate with
+          // caching at all.
+          if (linkEl) {
+            var l = document.createElement('link');
+            l.rel = 'stylesheet';
+            var linkCrossorigin = linkEl.getAttribute('crossorigin');
+            if (linkCrossorigin !== null) l.crossOrigin = linkCrossorigin;
+            l.href = linkEl.getAttribute('data-progressive-href');
+            document.head.appendChild(l);
+          }
+          if (scriptEl) {
+            var s = document.createElement('script');
+            s.type = 'module';
+            var scriptCrossorigin = scriptEl.getAttribute('crossorigin');
+            if (scriptCrossorigin !== null) s.crossOrigin = scriptCrossorigin;
+            s.src = scriptEl.getAttribute('data-progressive-src');
+            document.head.appendChild(s);
+          } else {
+            // Nothing to defer (dev server, or an unexpectedly missing
+            // entry) - the bar would otherwise sit there forever with
+            // nothing left to ever hide it.
+            window.__hideAppBootLoader();
+          }
+        }
+
+        if (!scriptEl || typeof fetch !== 'function' || typeof ReadableStream === 'undefined') {
+          loadDirectly();
+          return;
+        }
+
+        var jsUrl = scriptEl.getAttribute('data-progressive-src');
+        var cssUrl = linkEl ? linkEl.getAttribute('data-progressive-href') : null;
+
+        function fetchWithProgress(url, onChunk) {
+          return fetch(url).then(function (response) {
+            if (!response.ok || !response.body) throw new Error('load failed: ' + url);
+            var total = parseInt(response.headers.get('content-length') || '0', 10);
+            var reader = response.body.getReader();
+            function pump() {
+              return reader.read().then(function (result) {
+                if (result.done) return;
+                onChunk(result.value.length, total);
+                return pump();
+              });
+            }
+            return pump();
+          });
+        }
+
+        var jsTotal = 0;
+        var cssTotal = 0;
+        var jsReceived = 0;
+        var cssReceived = 0;
+
+        function updateCombined() {
+          var totalKnown = jsTotal + cssTotal;
+          if (totalKnown <= 0) {
+            setIndeterminate();
+            return;
+          }
+          var pct = Math.min(99, Math.round(((jsReceived + cssReceived) / totalKnown) * 100));
+          setProgress(pct);
+        }
+
+        var jsPromise = fetchWithProgress(jsUrl, function (chunkSize, total) {
+          jsReceived += chunkSize;
+          jsTotal = total;
+          updateCombined();
+        });
+        var cssPromise = cssUrl
+          ? fetchWithProgress(cssUrl, function (chunkSize, total) {
+              cssReceived += chunkSize;
+              cssTotal = total;
+              updateCombined();
+            })
+          : Promise.resolve();
+
+        Promise.all([jsPromise, cssPromise]).then(
+          function () {
+            setProgress(100);
+            loadDirectly();
+          },
+          function () {
+            // A failed fetch here (offline mid-load, etc.) still falls
+            // through to a normal, un-tracked load attempt - this bar is a
+            // progress indicator, never the thing standing between a user
+            // and the app actually loading.
+            loadDirectly();
+          },
+        );
+      })();
+    </script>
+  </body>
+</html>

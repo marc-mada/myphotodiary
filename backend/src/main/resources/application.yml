@@ -1,0 +1,159 @@
+spring:
+  application:
+    name: myphotodiary-backend
+
+  datasource:
+    # Isolated dev DB (file-mode HSQLDB, own file under backend/data/ -
+    # gitignored). Deliberately NOT the legacy app's database: HSQLDB
+    # file-mode locks the file to one JVM process, so this backend and the
+    # legacy Tomcat app can't share it as-is. Switching to a shared
+    # HSQLDB *server* process (so both can connect concurrently) is a
+    # separate, explicit step for when this screen is ready to go live
+    # against real data (docs/Design.md decision #4).
+    url: jdbc:hsqldb:file:${MPD_DB_PATH:./data/dev-db};shutdown=true
+    username: sa
+    password:
+    driver-class-name: org.hsqldb.jdbc.JDBCDriver
+
+  jpa:
+    hibernate:
+      # Flyway owns the schema - Hibernate only validates it matches the
+      # entities, never generates/alters DDL itself.
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  servlet:
+    multipart:
+      # Raised from 50MB (28/08/2026, video support) - this is just the
+      # servlet-level outer ceiling, not the real enforced limit: that's
+      # AppSettings.maxVideoSizeBytes (admin-editable, checked in
+      # ImportService against the actual uploaded file size), which defaults
+      # to 20MB (V10, lowered from an initial 500MB by V11) - well under this
+      # ceiling, so this should never actually be the thing that rejects an
+      # upload in practice.
+      max-file-size: 2GB
+      max-request-size: 2GB
+
+server:
+  tomcat:
+    # Tomcat's own connector-level POST size cap - independent of, and
+    # enforced *before*, spring.servlet.multipart above. Boot's own default
+    # (2MB) would silently reject any video upload well under the multipart
+    # limit above if left as-is - found by reading Boot's docs while
+    # implementing video support, not discovered by trial and error against
+    # a real oversized upload.
+    max-http-form-post-size: 2GB
+  servlet:
+    session:
+      # Session-cookie auth (18/09/2026, replaces HTTP Basic - see
+      # SecurityConfig's own javadoc) - explicit ask: "long-lived for 24h",
+      # not Tomcat's own 30-minute idle default (too short for an app
+      # people dip into casually) and not a pure browser-lifetime cookie
+      # (most friction). `timeout` is the server-side inactive-session
+      # expiry; `cookie.max-age` is what actually makes the cookie survive
+      # closing/reopening the browser within that window - a plain session
+      # cookie (no Max-Age at all) would still die at browser-close
+      # regardless of this `timeout` value, since Tomcat's default session
+      # cookie sets no Max-Age. Both set to the same 24h so neither outlives
+      # the other pointlessly.
+      timeout: 24h
+      cookie:
+        max-age: 24h
+        http-only: true
+        # Requires HTTPS on whatever origin the browser actually talks to
+        # (Apache in production, the mkcert-backed Vite dev server locally -
+        # dev-server-lan-access memory) - the backend's own embedded Tomcat
+        # is plain HTTP either way (behind a reverse proxy in both cases),
+        # but that's irrelevant to the browser's Secure-cookie decision,
+        # which only ever looks at the origin it itself connected to.
+        # A fresh checkout with no mkcert certs yet already can't use the
+        # download-to-folder feature either (File System Access API, same
+        # secure-context requirement) - this makes login join that same
+        # documented "needs mkcert" list, not a new kind of gap.
+        secure: true
+
+# Filesystem root for gallery originals/thumbnails - see StorageProperties.
+# Isolated dev path under backend/, gitignored, same spirit as datasource.url
+# above (not the legacy app's real imageRootPath).
+storage:
+  root: ${MPD_STORAGE_ROOT:./data/images}
+
+# Staging-import feature (01/09/2026) - see StagingProperties/
+# StagingImportService's own javadoc. Separate root from storage.root above:
+# not-yet-organized files an admin drops here (e.g. an external disk mounted
+# at this path), distinct from the real gallery tree.
+staging:
+  root: ${MPD_STAGING_ROOT:./data/staging}
+
+# Backup feature (18/09/2026) - see BackupProperties' own javadoc for the
+# full design, in particular why require-mount defaults to true. Isolated
+# dev path under backend/, gitignored, same spirit as the two roots above -
+# require-mount is left at its real (true) default even here, so a local
+# `mvn test`/dev run exercises the exact same "not mounted yet" refusal
+# path a fresh production install would hit before its NAS is set up,
+# rather than a dev-only shortcut silently diverging from prod behavior.
+backup:
+  root: ${MPD_BACKUP_ROOT:./data/backups}
+  enabled: ${MPD_BACKUP_ENABLED:true}
+  require-mount: ${MPD_BACKUP_REQUIRE_MOUNT:true}
+  # Optional: a file of this name must exist in the backup root, placed
+  # once on the real backup target. Set by the Docker image, where the
+  # mount check above can't tell a NAS from a plain host folder.
+  marker-file: ${MPD_BACKUP_MARKER_FILE:}
+  retention-days: ${MPD_BACKUP_RETENTION_DAYS:30}
+  db-cron: "${MPD_DB_BACKUP_CRON:0 0 2 * * *}"
+
+# Video support (28/08/2026) - ffmpeg/ffprobe must be installed and on PATH
+# (see VideoFormatValidator/VideoThumbnailExtractor's own javadoc for why -
+# strict H.264-codec validation and first-frame thumbnail extraction, no
+# server-side transcoding). Paths overridable here if they're not on PATH
+# for whatever process runs this app (e.g. a systemd unit with a minimal
+# PATH) - bare command names by default, resolved via the JVM's own PATH.
+app:
+  # Absolute scheme+host(+port) this backend is publicly reachable at
+  # (25/09/2026, ShareLinkPreviewController's own og:image tags need a real
+  # absolute URL - link-preview crawlers, unlike this app's own frontend,
+  # never send a Referer/Origin the backend could infer this from). Same
+  # "the backend has no reliable way to know its own public-facing
+  # scheme/host from behind a reverse proxy" limitation already documented
+  # on ShareLinkResponse - deliberately an explicit setting rather than
+  # trusting X-Forwarded-* headers this app has never configured Spring to
+  # trust (ForwardedHeaderFilter is not enabled). Left unset, falls back to
+  # reconstructing from the request actually received - correct for local/
+  # direct testing (no reverse proxy in the way), wrong behind Apache
+  # unless this is set explicitly to the real public origin, e.g.
+  # https://myphotodiary.example.com.
+  public-base-url: ${MPD_PUBLIC_BASE_URL:}
+  # Optional file where the token secrets below are generated and kept when
+  # not given explicitly (PersistedSecrets, 06/10/2026) - set by the Docker
+  # image so a new install needs no hand-made secrets. Unset: a random key
+  # per start, as before.
+  secrets-file: ${MPD_SECRETS_FILE:}
+  # Password given to the automatically created "admin" account, on first
+  # start only (BootstrapAdminInitializer). Unset: "admin".
+  initial-admin-password: ${MPD_INITIAL_ADMIN_PASSWORD:}
+  video:
+    ffmpeg-path: ${MPD_FFMPEG_PATH:ffmpeg}
+    ffprobe-path: ${MPD_FFPROBE_PATH:ffprobe}
+    # Signs short-lived video streaming tokens (VideoStreamTokenService) -
+    # unset by default (a random per-restart key, see that class's own
+    # javadoc for the accepted trade-off); set MPD_VIDEO_TOKEN_SECRET for a
+    # stable key that survives a restart, e.g. in prod.
+    token-secret: ${MPD_VIDEO_TOKEN_SECRET:}
+  share:
+    # Signs the longer-lived (30-day) external share links for a single
+    # image or a whole sequence (ShareTokenService, 02/09/2026) - same
+    # signed-token pattern as app.video.token-secret above, deliberately a
+    # separate key (not reused) so leaking/rotating one never affects the
+    # other's forgery-resistance. Same random-per-restart-key fallback and
+    # trade-off if left unset - a restart invalidates outstanding share
+    # links early, acceptable at this app's personal-sharing scale; set
+    # MPD_SHARE_TOKEN_SECRET for a stable key in prod.
+    token-secret: ${MPD_SHARE_TOKEN_SECRET:}

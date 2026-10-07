@@ -1,0 +1,15 @@
+Package: myphotodiary-backend
+Version: [[version]]-1
+Section: web
+Priority: optional
+Architecture: all
+Depends: openjdk-21-jre-headless, ffmpeg
+Maintainer: Marc Lamberton <321042643+marc-mada@users.noreply.github.com>
+Description: myPhotoDiary backend (Spring Boot)
+ REST API backend for myPhotoDiary: the photo/video gallery for families. It
+ takes care of your database of images and short videos, and provides Web
+ publishing, photo/video browsing, tagging, rating, commenting, sharing, and
+ rich search features. Your assets are protected by strong access control
+ (RBAC). It embeds a database to make deployment easy, and only relies on an
+ external web server (Caddy recommended) to serve its frontend static files
+ and to forward REST API requests to the backend.

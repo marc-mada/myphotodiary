@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily myPhotoDiary original photos/videos backup
+
+[Timer]
+# Staggered after the in-process DB backup (BackupProperties.dbCron,
+# default 02:00) so the two don't compete for disk/network I/O against the
+# same NAS target at the same moment.
+OnCalendar=*-*-* 03:00:00
+# Runs the missed backup shortly after boot if the server happened to be
+# off at 03:00 - a personal/family server, not an always-on datacenter box.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

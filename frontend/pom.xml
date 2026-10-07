@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright 2014-2026 Marc Lamberton
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<!--
+  Not the frontend's own build tool (01/09/2026) - that's still plain npm/
+  Vite exactly as before (`npm run build`, `npm run dev`, unchanged). This
+  exists solely so `mvn package` (optionally with `-P deb`) can drive that
+  same npm build via a normal Maven phase and, with the deb profile, package
+  its output as an installable .deb - see the deb profile below and
+  docs/Design.md §13 for why it ships to /opt/myphotodiary/frontend-dist
+  (a deliberate FHS choice).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>org.myphotodiary</groupId>
+	<artifactId>myphotodiary-frontend</artifactId>
+	<version>2.10.2</version>
+	<packaging>pom</packaging>
+
+	<!-- No <parent> here, so no inherited-URL issue like the backend module
+	     had (see backend/pom.xml's own comment on that) - added anyway for a
+	     real Homepage field in the built .deb's control file rather than
+	     none at all (jdeb's DebMojo reads project.getUrl() straight through). -->
+	<url>https://github.com/marc-mada/myphotodiary</url>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>3.5.0</version>
+				<executions>
+					<!-- Bound unconditionally (not just under -P deb) - `mvn package`
+					     alone in this directory is then a normal, useful way to build
+					     the frontend, same result as running npm by hand. -->
+					<execution>
+						<id>npm-ci</id>
+						<phase>generate-resources</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<configuration>
+							<executable>npm</executable>
+							<arguments>
+								<argument>ci</argument>
+							</arguments>
+						</configuration>
+					</execution>
+					<execution>
+						<id>npm-build</id>
+						<phase>compile</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<configuration>
+							<executable>npm</executable>
+							<arguments>
+								<argument>run</argument>
+								<argument>build</argument>
+							</arguments>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+	<profiles>
+		<!--
+		  `mvn package -P deb` (01/09/2026) - builds target/myphotodiary-
+		  frontend_${project.version}-1_all.deb, installing frontend/dist/ to
+		  /opt/myphotodiary/frontend-dist (an FHS location,
+		  see docs/Design.md §13), owned by www-data
+		  and world-readable, so any web server's own user can serve it. Pure
+		  static files, no maintainer scripts at all: the web server reads
+		  them on every request, nothing to reload.
+		-->
+		<profile>
+			<id>deb</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.vafer</groupId>
+						<artifactId>jdeb</artifactId>
+						<version>1.10</version>
+						<executions>
+							<execution>
+								<phase>package</phase>
+								<goals>
+									<goal>jdeb</goal>
+								</goals>
+								<configuration>
+									<!-- jdeb's own default is to silently skip a `pom`-packaged
+									     project (found live, this build's own first test - the
+									     goal ran and reported success without ever producing a
+									     .deb) - this project is deliberately `pom`-packaged (no
+									     real Java artifact, just a harness driving npm + jdeb),
+									     so that default has to be overridden explicitly. -->
+									<skipPOMs>false</skipPOMs>
+									<controlDir>${project.basedir}/src/deb/control</controlDir>
+									<deb>${project.build.directory}/myphotodiary-frontend_${project.version}-1_all.deb</deb>
+									<dataSet>
+										<!-- /opt and /opt/myphotodiary created explicitly with
+										     normal root:root/0755 ownership - found live in this
+										     build's own first test (inspecting the real archive):
+										     without this, jdeb applies the content directory's own
+										     mapper (www-data:www-data) to every parent it has to
+										     create, including /opt itself - a shared system
+										     directory. Only frontend-dist itself (and everything
+										     under it) should actually be www-data - the same as a
+										     manual
+										     `chown -R www-data:www-data .../frontend-dist` - not
+										     its parents. -->
+										<data>
+											<type>template</type>
+											<paths>
+												<path>opt</path>
+												<path>opt/myphotodiary</path>
+											</paths>
+											<mapper>
+												<type>perm</type>
+												<filemode>755</filemode>
+												<user>root</user>
+												<group>root</group>
+											</mapper>
+										</data>
+										<data>
+											<src>${project.basedir}/dist</src>
+											<type>directory</type>
+											<!-- Not real build output (macOS Finder metadata) - rides along in dist/
+											     only if the build machine happens to have Finder
+											     metadata for that directory, never something to ship. -->
+											<excludes>**/.DS_Store</excludes>
+											<mapper>
+												<type>perm</type>
+												<prefix>/opt/myphotodiary/frontend-dist</prefix>
+												<filemode>644</filemode>
+												<dirmode>755</dirmode>
+												<user>www-data</user>
+												<group>www-data</group>
+											</mapper>
+										</data>
+									</dataSet>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+</project>
