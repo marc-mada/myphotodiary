@@ -14,19 +14,33 @@
  * limitations under the License.
  ******************************************************************************/
 
-import { useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AuthImage } from '../gallery/AuthImage';
 import { AuthVideo } from '../gallery/AuthVideo';
 import { ProgressiveImage } from '../gallery/ProgressiveImage';
-import { usePinchGesture } from './usePinchGesture';
 import { useDoubleTap } from './useDoubleTap';
+import { useBlockNativePageZoom } from './useBlockNativePageZoom';
 
 // Legacy (idx.js/midx.js) doesn't expose a configurable swipe threshold -
 // jQuery Mobile's own swipeleft/swiperight events use a 30px default, kept
 // here for the same feel. A touch that moves less than this is a tap, not
 // a swipe attempt.
 const SWIPE_THRESHOLD_PX = 30;
+
+// Same cap as the native pinch-zoom this replaces (index.html's viewport
+// meta, maximum-scale=2.0, itself copied from legacy mindex.jsp).
+const MAX_ZOOM = 2;
+// Below this, a pinch that ends barely zoomed snaps back to exactly 1x.
+const MIN_ZOOM_SNAP = 1.02;
+
+function midpoint(touches) {
+	return { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 };
+}
+
+function distance(touches) {
+	return Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
+}
 
 /**
  * The mobile `.photoframe` (mindex.jsp/midx.js's `mobImageSwapper`) - swipe
@@ -72,16 +86,8 @@ const SWIPE_THRESHOLD_PX = 30;
  * doc for why double-tap, unlike single-tap, means the same thing on both
  * screens).
  *
- * One real platform wrinkle, not verifiable in this project's own headless
- * environment (no real device/browser double-tap heuristic to observe):
- * some mobile browsers treat a double-tap on a page that permits zooming
- * (index.html's own viewport meta, `user-scalable=yes`) as its own native
- * "zoom to this point" gesture, independently of this component's touch
- * handling below (which never calls `preventDefault`, on purpose - see
- * `usePinchGesture`'s own doc). On such a browser a double-tap here could
- * plausibly *also* trigger a brief native zoom alongside the chrome toggle
- * this component asked for - not reproduced or ruled out here, flagged
- * rather than silently assumed away.
+ * Native double-tap-to-zoom no longer competes with this double-tap: page
+ * zoom is blocked on this screen since 08/10/2026 (see "Zoom" below).
  *
  * `nextImage` (28/08/2026, explicit ask - "have you ported the legacy
  * next-image pre-fetch?" - answer at the time was desktop only) ports
@@ -121,23 +127,29 @@ const SWIPE_THRESHOLD_PX = 30;
  * progressive one.
  *
  * `onPinchOutAtRatioOne` (09/09/2026, mosaic screen - explicit ask):
- * pinching out (two fingers moving together) switches to the new mosaic
- * screen (MobileMosaicView, MobileApp wires the callback), but *only* when
- * the page isn't already zoomed in - pinching out while zoomed in (ratio >
- * 1) must keep behaving exactly like v2.3: nothing to do here at all, the
- * native browser pinch-zoom (index.html's viewport meta, minimum-scale=1/
- * maximum-scale=2, unchanged) simply zooms the picture back out on its own.
- * `window.visualViewport.scale` is the live magnification ratio the browser
- * is actually rendering at - read fresh at the moment a pinch gesture
- * completes rather than mirrored into React state anywhere, since it can
- * also change from zoom activity this component never sees a touch event
- * for (e.g. a gesture that started before this screen mounted). Falls back
- * to "assume ratio 1" if `visualViewport` isn't available at all (very old
- * browsers) - the more useful of the two possible guesses, given every
- * device this feature actually targets already relies on it implicitly via
- * the viewport meta tag's own min/max-scale. Pinching *in* is left
- * completely alone here (no `onPinchIn` passed to the hook below) - that's
- * the native zoom-in gesture, also unchanged from v2.3.
+ * pinching out (two fingers moving together) switches to the mosaic screen
+ * (MobileMosaicView, MobileApp wires the callback), but *only* when the
+ * picture isn't zoomed in - pinching out while zoomed in just zooms back out.
+ *
+ * Zoom (08/10/2026, explicit ask - "allow to zoom in the image even when the
+ * smartphone is in landscape/full-screen mode" and "magnify only the image,
+ * not the control bars which should not move"): this component now zooms the
+ * picture itself, instead of relying on the browser's whole-page pinch-zoom
+ * (index.html's viewport meta). The native zoom magnified and shifted the
+ * overlaid Menu/Quit/Go/Comment bars together with the picture, and Chrome
+ * doesn't offer page pinch-zoom at all in element full-screen (which
+ * `useLandscapeFullscreen` enters in landscape) - hence the report. Page
+ * zoom is now blocked on this screen (`useBlockNativePageZoom`, and
+ * `touch-action` in app.css) and the picture is scaled with a CSS transform
+ * on `.mobile-zoom-layer`:
+ * - two fingers: zoom (1x..MAX_ZOOM, same 2x cap as the old viewport meta)
+ *   around the point between the fingers, which follows the fingers;
+ * - one finger while zoomed: pan, clamped so the picture's edges never come
+ *   inside the frame (no panning into black); swiping to the next/previous
+ *   picture only works at 1x, as before;
+ * - a tap still counts toward the double-tap that toggles the bars;
+ * - zoom resets to 1x on every picture change and on resize/rotation.
+ * Videos aren't zoomable (their native controls need the touches).
  */
 export function MobileImageViewer({
 	image,
@@ -155,31 +167,153 @@ export function MobileImageViewer({
 	// See this component's own doc comment on progressive loading for why
 	// this is gated on the default AuthImage specifically.
 	const progressive = ImageComponent === AuthImage;
+	const zoomable = !!image && image.mediaType !== 'VIDEO';
+	const frameRef = useRef(null);
+	const layerRef = useRef(null);
+	// Current transform, kept in a ref and written straight to the layer's
+	// style on every touchmove - no React re-render per finger movement.
+	const zoom = useRef({ scale: 1, x: 0, y: 0 });
+	// The in-progress zoom/pan gesture, if any (null while swiping at 1x).
+	const gesture = useRef(null);
+	// Only drives `touch-action` (app.css): at 1x the frame keeps `pan-y`
+	// (pull-to-refresh still works), zoomed it becomes `none` so a one-finger
+	// pan is never taken over by the browser.
+	const [zoomed, setZoomed] = useState(false);
 	const touchStartX = useRef(null);
 	const registerTap = useDoubleTap(onTap);
+	useBlockNativePageZoom();
 
-	const pinch = usePinchGesture({
-		onPinchOut: () => {
-			const ratio = window.visualViewport?.scale ?? 1;
-			if (ratio <= 1.01) onPinchOutAtRatioOne?.();
-		},
-	});
+	const applyZoom = useCallback(() => {
+		const { scale, x, y } = zoom.current;
+		if (layerRef.current) {
+			layerRef.current.style.transform = scale === 1 ? '' : `translate(${x}px, ${y}px) scale(${scale})`;
+		}
+	}, []);
+
+	const resetZoom = useCallback(() => {
+		zoom.current = { scale: 1, x: 0, y: 0 };
+		gesture.current = null;
+		applyZoom();
+		setZoomed(false);
+	}, [applyZoom]);
+
+	useEffect(() => {
+		resetZoom();
+	}, [image?.id, resetZoom]);
+
+	useEffect(() => {
+		window.addEventListener('resize', resetZoom);
+		return () => window.removeEventListener('resize', resetZoom);
+	}, [resetZoom]);
+
+	// Keeps the picture covering the frame wherever it's larger than it:
+	// the translation is limited to the overflow on each axis, measured from
+	// the picture's own untransformed size (offsetWidth/Height ignore the
+	// CSS transform), so the black letterbox bars are never panned into view.
+	function clampTranslation() {
+		const frame = frameRef.current;
+		if (!frame) return;
+		const media = layerRef.current?.querySelector('.mobile-visible-image');
+		const contentWidth = media?.offsetWidth || frame.clientWidth;
+		const contentHeight = media?.offsetHeight || frame.clientHeight;
+		const { scale } = zoom.current;
+		const maxX = Math.max(0, (contentWidth * scale - frame.clientWidth) / 2);
+		const maxY = Math.max(0, (contentHeight * scale - frame.clientHeight) / 2);
+		zoom.current.x = Math.min(maxX, Math.max(-maxX, zoom.current.x));
+		zoom.current.y = Math.min(maxY, Math.max(-maxY, zoom.current.y));
+	}
+
+	// A point on screen, relative to the frame's centre - the layer's
+	// transform-origin, so `screen = translate + scale * content`.
+	function fromFrameCentre(point) {
+		const rect = frameRef.current.getBoundingClientRect();
+		return { x: point.x - (rect.left + rect.width / 2), y: point.y - (rect.top + rect.height / 2) };
+	}
+
+	function startPinch(touches) {
+		const { scale, x, y } = zoom.current;
+		const m = fromFrameCentre(midpoint(touches));
+		gesture.current = {
+			mode: 'pinch',
+			startDistance: distance(touches),
+			startScale: scale,
+			// The content point under the fingers, which stays under them.
+			contentX: (m.x - x) / scale,
+			contentY: (m.y - y) / scale,
+			startedAtOne: scale === 1,
+			lastDistance: distance(touches),
+		};
+	}
+
+	function startPan(touch) {
+		gesture.current = { mode: 'pan', lastX: touch.clientX, lastY: touch.clientY, startX: touch.clientX, startY: touch.clientY, moved: false };
+	}
 
 	function handleTouchStart(e) {
-		if (pinch.onTouchStart(e)) {
+		if (e.touches.length >= 2) {
 			touchStartX.current = null;
+			if (zoomable) startPinch(e.touches);
+			else gesture.current = { mode: 'pinch', startDistance: distance(e.touches), lastDistance: distance(e.touches), startedAtOne: true };
+			return;
+		}
+		if (zoomable && zoom.current.scale > 1) {
+			touchStartX.current = null;
+			startPan(e.touches[0]);
 			return;
 		}
 		touchStartX.current = e.touches[0].clientX;
 	}
 
 	function handleTouchMove(e) {
-		pinch.onTouchMove(e);
+		const g = gesture.current;
+		if (!g) return;
+		if (g.mode === 'pinch' && e.touches.length >= 2) {
+			g.lastDistance = distance(e.touches);
+			if (!zoomable) return;
+			const scale = Math.min(MAX_ZOOM, Math.max(1, (g.startScale * g.lastDistance) / g.startDistance));
+			const m = fromFrameCentre(midpoint(e.touches));
+			zoom.current = { scale, x: m.x - scale * g.contentX, y: m.y - scale * g.contentY };
+			clampTranslation();
+			applyZoom();
+		} else if (g.mode === 'pan' && e.touches.length === 1) {
+			const touch = e.touches[0];
+			zoom.current.x += touch.clientX - g.lastX;
+			zoom.current.y += touch.clientY - g.lastY;
+			g.lastX = touch.clientX;
+			g.lastY = touch.clientY;
+			if (Math.hypot(touch.clientX - g.startX, touch.clientY - g.startY) >= SWIPE_THRESHOLD_PX) g.moved = true;
+			clampTranslation();
+			applyZoom();
+		}
+	}
+
+	function endPinch(g) {
+		const delta = g.lastDistance - g.startDistance;
+		if (zoom.current.scale < MIN_ZOOM_SNAP) {
+			resetZoom();
+		} else {
+			setZoomed(true);
+		}
+		// Same 40px threshold as usePinchGesture (used by MobileMosaicView) - fingers
+		// coming together, starting from 1x, is the "go to mosaic" gesture.
+		if (g.startedAtOne && delta <= -40) onPinchOutAtRatioOne?.();
 	}
 
 	function handleTouchEnd(e) {
-		if (pinch.onTouchEnd(e)) {
-			touchStartX.current = null;
+		const g = gesture.current;
+		if (g?.mode === 'pinch') {
+			if (e.touches.length >= 2) return; // a third finger lifted
+			gesture.current = null;
+			endPinch(g);
+			// One finger still down after a pinch: carry on as a pan, rather
+			// than letting that finger start a swipe to another picture.
+			if (e.touches.length === 1 && zoomable && zoom.current.scale > 1) startPan(e.touches[0]);
+			return;
+		}
+		if (g?.mode === 'pan') {
+			if (e.touches.length > 0) return;
+			gesture.current = null;
+			if (!g.moved) registerTap();
 			return;
 		}
 		if (touchStartX.current == null) return;
@@ -197,6 +331,7 @@ export function MobileImageViewer({
 	if (!image) {
 		return (
 			<div
+				ref={frameRef}
 				className="mobile-photoframe mobile-photoframe-empty"
 				onTouchStart={handleTouchStart}
 				onTouchMove={handleTouchMove}
@@ -208,14 +343,22 @@ export function MobileImageViewer({
 	}
 
 	return (
-		<div className="mobile-photoframe" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-			{image.mediaType === 'VIDEO' ? (
-				<AuthVideo imageId={image.id} className="mobile-visible-image" />
-			) : progressive ? (
-				<ProgressiveImage src={image.webUrl} thumbnailSrc={image.thumbnailUrl} alt={image.name} className="mobile-visible-image" />
-			) : (
-				<ImageComponent src={image.webUrl} alt={image.name} className="mobile-visible-image" />
-			)}
+		<div
+			ref={frameRef}
+			className={`mobile-photoframe${zoomed ? ' zoomed' : ''}`}
+			onTouchStart={handleTouchStart}
+			onTouchMove={handleTouchMove}
+			onTouchEnd={handleTouchEnd}
+		>
+			<div ref={layerRef} className="mobile-zoom-layer">
+				{image.mediaType === 'VIDEO' ? (
+					<AuthVideo imageId={image.id} className="mobile-visible-image" />
+				) : progressive ? (
+					<ProgressiveImage src={image.webUrl} thumbnailSrc={image.thumbnailUrl} alt={image.name} className="mobile-visible-image" />
+				) : (
+					<ImageComponent src={image.webUrl} alt={image.name} className="mobile-visible-image" />
+				)}
+			</div>
 			{nextImage && nextImage.mediaType !== 'VIDEO' && <ImageComponent key={nextImage.id} src={nextImage.webUrl} alt="" className="preload-image" />}
 		</div>
 	);

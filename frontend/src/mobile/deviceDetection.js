@@ -83,3 +83,22 @@ export function isIOSDevice() {
 	if (/iPad|iPhone|iPod/.test(navigator.userAgent)) return true;
 	return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
 }
+
+/**
+ * True on a tablet-sized screen (08/10/2026): the physical screen's short
+ * side is at least 700 CSS px. Drives the larger mobile corner buttons/menu/
+ * banner (`.mpd-large-screen` in app.css, set once in main.jsx).
+ *
+ * `screen.width/height` rather than a CSS media query on the viewport: the
+ * viewport shrinks by whatever the browser's own bars take, which differs
+ * per browser and orientation - an iPad Air (1180x820) in landscape has
+ * less than 700px of page height left under Safari/Chrome's bars, so a
+ * viewport test made its buttons shrink when rotated (reported live), while
+ * a width-only test enlarged a phone's buttons in landscape (1080x2400 phone
+ * is ~915px wide). The screen's short side is the same in both orientations:
+ * ~360-450px on a phone, 750px+ on a 10"+ tablet.
+ */
+export function isLargeScreen() {
+	if (typeof screen === 'undefined') return false;
+	return Math.min(screen.width, screen.height) >= 700;
+}

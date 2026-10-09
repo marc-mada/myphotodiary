@@ -20,6 +20,11 @@ import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import './app.css';
 import './i18n';
+import { isLargeScreen } from './mobile/deviceDetection';
+
+// Tablet-sized screen: larger mobile corner buttons/menu/banner (app.css).
+// Decided once from the physical screen, so rotating never changes it.
+document.documentElement.classList.toggle('mpd-large-screen', isLargeScreen());
 
 createRoot(document.getElementById('root')).render(
 	<StrictMode>

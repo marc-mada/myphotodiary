@@ -30,15 +30,28 @@ itself, see the [Installation Guide](Installation%20Guide.md).
 
 ## 1. Getting Started
 
-As a photographer you may use different cameras and different image workflows
-- smartphones permanently connected through 4/5G or WiFi to the Internet : you will use your browser to connect to myPhotoDiary and Publish you selected images or small videos from your galery.
-- Hybrid or compact cameras. You usually use a PC to read the camera memory card and process your images. Then you connect to myPhotoDiary through WiFi/Internet and Publish your best images.
+### How to publish your photos
 
-Once they are published, your images are automatically indexed, saved and made visible on the Internet: You can share them with your relatives and friends. You and your relatives can comment and rate images and sequences of images to help remember the context of an event.
+Whether you take pictures with a smartphone or a dedicated camera, myPhotoDiary makes it easy to publish your photos and short videos, organize your collection, and share your memories with family and friends.
 
-To access myPhotoDiary open your instance's URL in a browser and sign in with the username and
-password an administrator gave you — the same account works on both
-desktop and mobile, there's nothing separate to set up for either.
+Your workflow will depend on the equipment you use:
+
+- Smartphones and tablets — If your device is connected to the Internet through Wi-Fi or a mobile     network (4G/5G), simply open myPhotoDiary in your browser and publish selected photos or short videos directly from your photo gallery.
+- Digital cameras — If you use a compact or mirrorless camera, you will typically transfer your   pictures from the camera's memory card to a computer first. After selecting and processing your best shots, connect to myPhotoDiary through your browser and publish them.
+
+### What happens after you publish?
+
+Once published, your photos and videos are automatically indexed and stored by myPhotoDiary, making them easy to browse and search.
+
+You can share your published photos and sequences with family and friends. Depending on their access permissions, they can also comment on and rate photos or entire sequences, helping everyone remember the people, places, and stories behind each event.
+
+Your collection is hosted on your myPhotoDiary instance. Whether it is accessible over the Internet depends on how your instance is configured.
+
+### Signing in to myPhotoDiary
+
+To get started, open your myPhotoDiary instance's URL in a web browser and sign in using the username and password provided by your administrator.
+
+One account, any device. Your account works on both desktop and mobile interfaces, so there is no need to create separate accounts or configure anything specific to your device.
 
 - If the username or password is wrong, the form stays on screen with an
   "Invalid username or password." message underneath it — check with an
@@ -895,9 +908,14 @@ to after selecting a sequence from Go (§9.2):
 - **Double-tap** the picture — reveals or hides the four corner buttons
   (§9.1); the same gesture also closes an open Go or Menu panel first,
   if one was left open (§9.2).
-- **Pinch out** — switches to the mosaic view below, but only while the
-  picture is at its normal, un-zoomed size; pinching out while already
-  zoomed in still just zooms back out normally instead, unaffected.
+- **Pinch in** (spread two fingers) — zooms into the picture, up to
+  twice its size, also in landscape/full-screen. Only the picture is
+  magnified: the corner buttons stay where they are. While zoomed in,
+  **drag with one finger** to move around the picture; swiping to the
+  next picture works again once you're back at normal size. Zoom resets
+  when you change picture or turn the phone. Videos can't be zoomed.
+- **Pinch out** — zooms back out; at normal size, switches to the mosaic
+  view below.
 - Turning the phone to **landscape**, then tapping anywhere once, goes
   full-screen automatically — it reclaims the space the phone's own
   address bar/toolbar would otherwise eat out of an already-short

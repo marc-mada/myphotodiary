@@ -2048,6 +2048,11 @@ button.danger {
 	overflow: hidden;
 	background: rgb(25, 25, 25);
 	color: rgb(220, 220, 220);
+	/* No native page pinch-zoom anywhere on the home page (08/10/2026,
+	   explicit ask): it would magnify and move the overlaid control bars.
+	   The picture zooms by itself (MobileImageViewer); scrolling (nav/menu
+	   panel lists) is unaffected. iOS: see useBlockNativePageZoom.js. */
+	touch-action: pan-x pan-y;
 }
 
 .mobile-home-main {
@@ -2376,11 +2381,28 @@ button.danger {
 	background: black;
 	overflow: hidden;
 	/* pan-y (not pan-x): a horizontal drag stays native-gesture-free so
-	   MobileImageViewer's own touchstart/touchend can read it as a swipe;
-	   pinch-zoom is listed explicitly - `touch-action` is a restriction
-	   list, so leaving it out here would have silently blocked the native
-	   pinch-to-zoom the viewport meta tag (index.html) just enabled. */
-	touch-action: pan-y pinch-zoom;
+	   MobileImageViewer's own touchstart/touchend can read it as a swipe.
+	   No pinch-zoom since 08/10/2026: the picture is zoomed by
+	   MobileImageViewer itself, never the whole page (see its doc). */
+	touch-action: pan-y;
+}
+
+/* Zoomed in: one finger pans the picture, so nothing is left to the
+   browser (not even the vertical pull-to-refresh pan-y keeps at 1x). */
+.mobile-photoframe.zoomed {
+	touch-action: none;
+}
+
+/* What MobileImageViewer scales/translates when zooming - fills the frame
+   so .mobile-visible-image's max-width/max-height still resolve against
+   the frame's size, and scales around its centre. */
+.mobile-zoom-layer {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transform-origin: center center;
 }
 
 .mobile-photoframe-empty p {
@@ -2631,14 +2653,17 @@ div.mobile-mosaic-thumb-img {
 ** same mobile presentation, not the desktop one - confirmed fine as a
 ** presentation choice ("Mobile UI is fine with smartphone"), just too
 ** small a touch target/read size on the extra screen real estate a
-** tablet actually has. A plain `min-width` breakpoint layered on top,
-** scoped to the specific elements named, rather than a second device-
-** detection path - 700px comfortably clears real smartphones (6-7",
-** ~390-500px CSS width even landscape-rotated at the top end) without
-** waiting for a full 768/1024px "classic tablet" breakpoint most 10"+
-** tablets already exceed in portrait too.
+** tablet actually has. Scoped to the specific elements named.
+**
+** Gated on `.mpd-large-screen` on <html> (08/10/2026), set once from the
+** physical screen's short side (deviceDetection.js isLargeScreen), so the
+** size never changes on rotation. It used to be a viewport media query:
+** `min-width: 700px` enlarged a 1080x2400 phone's buttons in landscape
+** (~915px wide), and adding `min-height: 700px` then shrank an iPad Air's
+** in landscape (the browser's bars leave under 700px of page height) -
+** both reported live.
 *************************************/
-@media (min-width: 700px) {
+
 	/* The four always-in-a-corner buttons (Menu/Quit/Go/Edit -
 	   .mobile-home-header/.mobile-home-footer only, not every mobile
 	   button - .mobile-page-header's own Home/Quit on the full-screen sub-
@@ -2647,8 +2672,8 @@ div.mobile-mosaic-thumb-img {
 	   both padding axes (not just height) - these read as compact pill
 	   buttons, meant to grow as a whole, unlike the menu list below whose
 	   own width was explicitly called out as already correct. */
-	.mobile-home-header button,
-	.mobile-home-footer button {
+	.mpd-large-screen .mobile-home-header button,
+	.mpd-large-screen .mobile-home-footer button {
 		padding: 0.6rem 1.35rem;
 		font-size: 1.5em;
 	}
@@ -2666,8 +2691,8 @@ div.mobile-mosaic-thumb-img {
 	   otherwise fall back to the browser's plain default button sizing), so
 	   both need the same explicit tablet-only values, not a scale-up of an
 	   explicit base that doesn't exist. */
-	.mobile-panel-list button,
-	.mobile-panel-back {
+	.mpd-large-screen .mobile-panel-list button,
+	.mpd-large-screen .mobile-panel-back {
 		padding-top: 0.6rem;
 		padding-bottom: 0.6rem;
 		font-size: 1.5em;
@@ -2677,10 +2702,9 @@ div.mobile-mosaic-thumb-img {
 	   ratio), so scaling height by 1.5 already grows both dimensions in
 	   proportion, exactly "50% in both directions" for an aspect-locked
 	   image. */
-	.mobile-home-logo {
+	.mpd-large-screen .mobile-home-logo {
 		height: 33px;
 	}
-}
 
 /*************************************
 ** Mobile UI in landscape (03/09/2026, explicit ask - "the address and

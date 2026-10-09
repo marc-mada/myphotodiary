@@ -56,9 +56,11 @@ instead — it covers actually using the application.
 
 ## 2. System Requirements
 
-- **Operating system**: Debian or Ubuntu Linux for the `.deb`
+- **Operating system**: A PC with Debian or Ubuntu Linux for the `.deb`
   packages (§5). For the Docker image (§6), any machine that runs Docker
   — see §6.1.
+- **Network access**: A fiber access for your server to the Internet with a 
+  public IP address.
 - **Java**: version 21 or newer, to run the backend. You don't need to
   install this yourself — the backend package depends on
   `openjdk-21-jre-headless` and `apt` installs it automatically (the
@@ -69,7 +71,7 @@ instead — it covers actually using the application.
   included in the Docker image.
 - **A web server**: Caddy, to serve the frontend and expose the backend
   over HTTPS (§4). Not needed with the Docker image, which has its own.
-- **A hostname** pointing to the server, and ports 80/443 reachable from
+- **A hostname** pointing to the server public IP address, and ports 80/443 reachable from
   the Internet, if the instance will be reachable from the Internet — Caddy
   then gets the HTTPS certificate from
   [Let's Encrypt](https://letsencrypt.org/) by itself.
@@ -253,10 +255,10 @@ thing: port 8090 genuinely isn't reachable from anywhere but
 Release with both packages attached, together with its release notes and
 SHA-256 checksums: <https://github.com/marc-mada/myphotodiary/releases>
 
-On the server, for example for version 2.10.2:
+On the server, for example for version 2.10.3:
 
 ```bash
-V=2.10.2
+V=2.10.3
 wget https://github.com/marc-mada/myphotodiary/releases/download/v$V/myphotodiary-backend_$V-1_all.deb
 wget https://github.com/marc-mada/myphotodiary/releases/download/v$V/myphotodiary-frontend_$V-1_all.deb
 sha256sum myphotodiary-*.deb   # compare with the checksums on the release page
@@ -269,7 +271,7 @@ server). Clone the source repository:
 ```bash
 git clone https://github.com/marc-mada/myphotodiary.git
 cd myphotodiary
-git checkout v2.10.2   # or whichever version you want
+git checkout v2.10.3   # or whichever version you want
 mvn -P deb clean package -DskipTests
 ```
 
@@ -423,14 +425,14 @@ From version 2.10.0, each release publishes the image to GitHub's
 container registry, `ghcr.io/marc-mada/myphotodiary`:
 
 ```bash
-docker pull ghcr.io/marc-mada/myphotodiary:2.10.2
+docker pull ghcr.io/marc-mada/myphotodiary:2.10.3
 ```
 
 **Or build it yourself** from the source repository (§5.1), on a machine with JDK 21, Maven, Node.js/`npm` and Docker:
 
 ```bash
-git checkout v2.10.2
-docker/build.sh        # produces the image myphotodiary:2.10.2
+git checkout v2.10.3
+docker/build.sh        # produces the image myphotodiary:2.10.3
 ```
 
 `docker/build.sh --all` builds both Intel (amd64) and ARM (arm64)
@@ -440,8 +442,8 @@ write access). `build.sh` runs `mvn clean package` first, so on a
 development machine it replaces the jar a locally running backend may be
 using — restart that backend afterwards.
 
-Then use `myphotodiary:2.10.2` instead of
-`ghcr.io/marc-mada/myphotodiary:2.10.2` in the commands below.
+Then use `myphotodiary:2.10.3` instead of
+`ghcr.io/marc-mada/myphotodiary:2.10.3` in the commands below.
 
 ### 6.3 Preparing the data folder
 
@@ -493,12 +495,12 @@ docker run -d --name myphotodiary --restart unless-stopped \
   -e MPD_ACME_EMAIL=you@example.com \
   -e MPD_INITIAL_ADMIN_PASSWORD='choose-a-strong-password' \
   --memory 2g --log-opt max-size=10m --log-opt max-file=3 \
-  ghcr.io/marc-mada/myphotodiary:2.10.2
+  ghcr.io/marc-mada/myphotodiary:2.10.3
 
 docker logs -f myphotodiary     # Ctrl-C to stop following
 ```
 
-The log should show `myphotodiary 2.10.2: Let's Encrypt certificate for
+The log should show `myphotodiary 2.10.3: Let's Encrypt certificate for
 photos.example.com`, then `certificate obtained successfully` within a
 minute or so. Open `https://photos.example.com` and sign in as `admin`
 with the password you chose (§7).
@@ -943,11 +945,11 @@ docker stop myphotodiary
 ls /mnt/myphotodiary-backup/db/        # pick a snapshot
 docker run --rm --user "$(id -u):$(id -g)" \
   -v /srv/myphotodiary:/data -v /mnt/myphotodiary-backup:/data/backup \
-  --entrypoint myphotodiary-restore-db ghcr.io/marc-mada/myphotodiary:2.10.2 \
+  --entrypoint myphotodiary-restore-db ghcr.io/marc-mada/myphotodiary:2.10.3 \
   /data/backup /data/db <timestamp>            # dry-run; add --yes to restore
 docker run --rm --user "$(id -u):$(id -g)" \
   -v /srv/myphotodiary:/data -v /mnt/myphotodiary-backup:/data/backup \
-  --entrypoint myphotodiary-restore-images ghcr.io/marc-mada/myphotodiary:2.10.2 \
+  --entrypoint myphotodiary-restore-images ghcr.io/marc-mada/myphotodiary:2.10.3 \
   /data/backup /data/images <timestamp>        # dry-run; add --yes to restore
 docker start myphotodiary
 ```
@@ -985,7 +987,7 @@ sudo apt remove caddy
 
 ```bash
 docker rm -f myphotodiary                          # the container
-docker rmi ghcr.io/marc-mada/myphotodiary:2.10.2   # the image
+docker rmi ghcr.io/marc-mada/myphotodiary:2.10.3   # the image
 ```
 
 The data folder (§6.3) is left untouched; delete it yourself once you're

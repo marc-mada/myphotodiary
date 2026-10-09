@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { AuthImage } from '../gallery/AuthImage';
 import { usePinchGesture } from './usePinchGesture';
 import { useDoubleTap } from './useDoubleTap';
+import { useBlockNativePageZoom } from './useBlockNativePageZoom';
 
 // 4px margins, explicit ask - both between images in a row and between rows.
 const GAP_PX = 4;
@@ -183,6 +184,8 @@ function packIntoPages(images, aspectRatios, availableWidth, rowHeight, rowsPerP
  * a conflict; nothing here tries to suppress the click to prevent that.
  */
 export function MobileMosaicView({ images, currentId, onSelect, onPinchIn, onDoubleTap }) {
+	// Bars stay put on this screen too (see useBlockNativePageZoom).
+	useBlockNativePageZoom();
 	const { t } = useTranslation();
 	const containerRef = useRef(null);
 	const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });

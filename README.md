@@ -2,20 +2,37 @@
   <img src="docs/images/photodiary-logo.jpg" width="300" alt="myPhotoDiary logo">
 </p>
 
-# myPhotoDiary
+# myPhotoDiary: Your memories shared with the people who matter
 
-If you do not trust private companies to keep the photos of your life, you may consider hosting your own Content Management system (CMS) optimized for family photos and short videos. 
-With this self-hosted Web application, targeting the family or small groups of people, you can publish, browse and share a collection of pictures and short videos, organized as a directory tree
-(`year/month/sequence`).
-You can also comment on, tag, rate, and search your medias which are automatically indexed. 
+We capture countless moments of our lives through photos and videos. Family gatherings, holidays, celebrations, everyday moments… Together, they tell the story of our lives and create memories worth preserving.
 
-Dedicated desktop and mobile user interfaces share
-one backend, with an admin screen for user/group/role management. Sharing of images and sequences is easy through
-time-limited external links with someone who doesn't have an account. The mobile interface for smartphone/tablet is optimized to offer a fluid user experience even with various network conditions.
+Yet, our photos are often scattered across phones, social networks, and cloud services. While these platforms make sharing easy, they don't always offer the privacy, control, or long-term preservation we want for our personal and family memories.
 
-Originally a Java Servlet/JSP and Javascript application (2014), being rebuilt and optimized onto Spring Boot + React + HSQLDB (2026). It is packaged for Debian/Ubuntu, and as a single Docker image (backend, web application and a web server with automatic HTTPS certificates) that runs on any Linux machine, a NAS or a Mac — Intel or ARM.
+**What if you could create your own private space to share these memories with family and friends?**
 
-This CMS can automatically and daily backup all its data (photo, video, database) to a NAS server. 
+This self-hosted photo management platform lets you organize, preserve, and share your personal photos and videos in a space you control. Bring your loved ones together around the moments that matter, without relying on public social networks or entrusting your entire collection to commercial photo platforms.
+
+## Everything you need to manage and share your memories
+
+Designed for families and small groups of friends, this self-hosted web application makes it easy to store, browse, organize, and share collections of photos and short videos.
+
+* **Organized collections** — Browse your media through a familiar directory structure, organized by year, month, and sequence (`year/month/sequence`).
+* **Find and rediscover memories** — Photos and videos are automatically indexed, making it easy to search your collection. Add comments, tags, and ratings to enrich and organize your memories.
+* **Share privately** — Share individual photos or entire sequences with anyone, even if they don't have an account, using external links that automatically expire after a configurable period.
+* **Desktop and mobile access** — Dedicated desktop and mobile interfaces share the same backend, with a responsive experience designed to work smoothly across different devices and network conditions.
+* **Manage your community** — An administration interface lets you manage users, groups, and roles, giving you control over who can access and share your collections.
+
+## Your memories, hosted your way
+
+First developed in 2014 using Java Servlets, JSP, and JavaScript, the application is being rebuilt and modernized in 2026 with **Spring Boot and React**.
+
+Deployment is designed to be straightforward. The application is available as a package for Debian and Ubuntu, or as a single Docker image bundling the backend, web application, and web server with automatic HTTPS certificate management.
+
+Run it on your own Linux machine, NAS, or Mac — whether powered by Intel or ARM — and keep your photo collection under your control.
+
+## Protect your memories with automatic backups
+
+The application can automatically back up its data every day, including photos, videos, and the database, to a NAS server.
 
 ## Download
 
@@ -58,6 +75,15 @@ myPhotoDiary bundles third-party components under their own licenses —
 see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Release Notes
+
+### 2.10.3 — 2026-10-09
+
+- Mobile: zoom into a picture with two fingers, also in landscape/
+  full-screen. Only the picture is magnified; the corner buttons stay in
+  place. Drag with one finger to move around a zoomed picture.
+- **Fix** (mobile): on a phone, the corner buttons, menu and banner no
+  longer grow when the phone is turned to landscape (only tablets get the
+  larger size), and on a tablet they no longer shrink in landscape.
 
 ### 2.10.2 — 2026-10-08
 

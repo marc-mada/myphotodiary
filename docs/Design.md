@@ -755,13 +755,18 @@ for the full rationale)
   `ImageResponse` still has no width/height field, a known gap, §12) and
   paged horizontally (swipe) rather than scrolled vertically, row count
   driven by measured available height so portrait fits more rows than
-  landscape. Switched by pinching, not a button: pinch-out at
-  magnification ratio 1 (`usePinchGesture`, reading
-  `window.visualViewport.scale`) enters the mosaic; pinch-out while
-  already zoomed in, and pinch-in on the single-image screen, are both
-  left entirely to the browser's own native pinch-zoom (unchanged);
-  pinch-in on the mosaic returns to the single-image screen on whichever
-  thumbnail is current. Session start always defaults to the single-image
+  landscape. Switched by pinching, not a button: pinch-out on the
+  single-image screen while the picture is at 1x enters the mosaic;
+  pinch-in on the mosaic (`usePinchGesture`) returns to the single-image
+  screen on whichever thumbnail is current.
+- Picture zoom (single-image screen): done by `MobileImageViewer` itself
+  (CSS transform on `.mobile-zoom-layer`, pinch to zoom 1x-2x around the
+  fingers, one-finger pan clamped to the picture's edges, reset on picture
+  change/resize), not by the browser's page zoom - which magnified the
+  overlaid corner bars too, and isn't available in element full-screen.
+  Page zoom is blocked on the home page (`touch-action: pan-x pan-y`,
+  plus `useBlockNativePageZoom` for iOS gesture events); other mobile
+  pages keep it. Session start always defaults to the single-image
   screen.
 - Reduced edit forms (description only), no slideshow/full-screen/delete.
 - Native camera capture entry point, PWA "Add to Home Screen" manifest.

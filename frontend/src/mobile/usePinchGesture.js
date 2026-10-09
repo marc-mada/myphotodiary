@@ -31,8 +31,9 @@ function distanceBetween(touches) {
 
 /**
  * Bare two-finger pinch detection (09/09/2026, mosaic screen - explicit
- * ask), shared by MobileImageViewer (pinch-out at ratio 1 -> mosaic screen)
- * and MobileMosaicView (pinch-in -> single-image screen). "Pinch in"
+ * ask), used by MobileMosaicView (pinch-in -> single-image screen).
+ * MobileImageViewer used it too until 08/10/2026, when it got its own live
+ * image zoom (which needs the distance on every move, not just at the end). "Pinch in"
  * (fingers moving apart - the same gesture that zooms *in*) vs. "pinch out"
  * (fingers moving together - zooms *out*), decided once the gesture is
  * actually over (second finger lifts), the same way MobileImageViewer's own
