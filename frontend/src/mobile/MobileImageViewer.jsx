@@ -145,8 +145,9 @@ function distance(touches) {
  * - two fingers: zoom (1x..MAX_ZOOM, same 2x cap as the old viewport meta)
  *   around the point between the fingers, which follows the fingers;
  * - one finger while zoomed: pan, clamped so the picture's edges never come
- *   inside the frame (no panning into black); swiping to the next/previous
- *   picture only works at 1x, as before;
+ *   inside the frame (no panning into black). Once the picture can't move
+ *   any further left (resp. right), the *next* swipe left (resp. right)
+ *   shows the next (resp. previous) picture at 1x (10/10/2026 trial);
  * - a tap still counts toward the double-tap that toggles the bars;
  * - zoom resets to 1x on every picture change and on resize/rotation.
  * Videos aren't zoomable (their native controls need the touches).
@@ -210,15 +211,22 @@ export function MobileImageViewer({
 	// the translation is limited to the overflow on each axis, measured from
 	// the picture's own untransformed size (offsetWidth/Height ignore the
 	// CSS transform), so the black letterbox bars are never panned into view.
-	function clampTranslation() {
+	function translationLimits() {
 		const frame = frameRef.current;
-		if (!frame) return;
+		if (!frame) return { maxX: 0, maxY: 0 };
 		const media = layerRef.current?.querySelector('.mobile-visible-image');
 		const contentWidth = media?.offsetWidth || frame.clientWidth;
 		const contentHeight = media?.offsetHeight || frame.clientHeight;
 		const { scale } = zoom.current;
-		const maxX = Math.max(0, (contentWidth * scale - frame.clientWidth) / 2);
-		const maxY = Math.max(0, (contentHeight * scale - frame.clientHeight) / 2);
+		return {
+			maxX: Math.max(0, (contentWidth * scale - frame.clientWidth) / 2),
+			maxY: Math.max(0, (contentHeight * scale - frame.clientHeight) / 2),
+		};
+	}
+
+	function clampTranslation() {
+		if (!frameRef.current) return;
+		const { maxX, maxY } = translationLimits();
 		zoom.current.x = Math.min(maxX, Math.max(-maxX, zoom.current.x));
 		zoom.current.y = Math.min(maxY, Math.max(-maxY, zoom.current.y));
 	}
@@ -246,7 +254,21 @@ export function MobileImageViewer({
 	}
 
 	function startPan(touch) {
-		gesture.current = { mode: 'pan', lastX: touch.clientX, lastY: touch.clientY, startX: touch.clientX, startY: touch.clientY, moved: false };
+		// Whether the picture's right/left edge was already against the
+		// frame when this drag began: a swipe that can't move the picture
+		// any further that way goes to the next/previous picture instead.
+		const { maxX } = translationLimits();
+		const { x } = zoom.current;
+		gesture.current = {
+			mode: 'pan',
+			lastX: touch.clientX,
+			lastY: touch.clientY,
+			startX: touch.clientX,
+			startY: touch.clientY,
+			moved: false,
+			rightEdgeShown: x <= -maxX + 0.5,
+			leftEdgeShown: x >= maxX - 0.5,
+		};
 	}
 
 	function handleTouchStart(e) {
@@ -313,7 +335,15 @@ export function MobileImageViewer({
 		if (g?.mode === 'pan') {
 			if (e.touches.length > 0) return;
 			gesture.current = null;
-			if (!g.moved) registerTap();
+			if (!g.moved) {
+				registerTap();
+				return;
+			}
+			const dx = g.lastX - g.startX;
+			const horizontal = Math.abs(dx) >= SWIPE_THRESHOLD_PX && Math.abs(dx) > Math.abs(g.lastY - g.startY);
+			// Picture changes reset the zoom to 1x (effect on image.id).
+			if (horizontal && dx < 0 && g.rightEdgeShown && hasNext) onNext();
+			else if (horizontal && dx > 0 && g.leftEdgeShown && hasPrevious) onPrevious();
 			return;
 		}
 		if (touchStartX.current == null) return;

@@ -3,7 +3,7 @@
 #
 # Built from the repository root, after the jar and the frontend have been
 # built by Maven (docker/build.sh does both):
-#   docker build -f docker/Dockerfile --build-arg VERSION=2.10.3 -t myphotodiary:2.10.3 .
+#   docker build -f docker/Dockerfile --build-arg VERSION=2.10.4 -t myphotodiary:2.10.4 .
 #
 # Everything installation-specific (domain, secrets, data folders) is given
 # when the container starts, never here (see entrypoint.sh for the HTTPS

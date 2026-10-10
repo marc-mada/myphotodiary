@@ -911,9 +911,13 @@ to after selecting a sequence from Go (§9.2):
 - **Pinch in** (spread two fingers) — zooms into the picture, up to
   twice its size, also in landscape/full-screen. Only the picture is
   magnified: the corner buttons stay where they are. While zoomed in,
-  **drag with one finger** to move around the picture; swiping to the
-  next picture works again once you're back at normal size. Zoom resets
-  when you change picture or turn the phone. Videos can't be zoomed.
+  **drag with one finger** to move around the picture. Once the picture
+  can't move any further left, the next **swipe left** shows the next
+  picture, at normal size (and likewise to the right for the previous
+  one). If the zoomed picture is still narrower than the screen, there's
+  nothing to move sideways, so a swipe changes picture straight away.
+  Zoom resets when you change picture or turn the phone. Videos can't be
+  zoomed.
 - **Pinch out** — zooms back out; at normal size, switches to the mosaic
   view below.
 - Turning the phone to **landscape**, then tapping anywhere once, goes

@@ -76,6 +76,12 @@ see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Release Notes
 
+### 2.10.4 — 2026-10-10
+
+- Mobile: on a zoomed picture, swiping left or right moves it; once it
+  can't move any further, the next swipe that way shows the next
+  (or previous) picture at normal size.
+
 ### 2.10.3 — 2026-10-09
 
 - Mobile: zoom into a picture with two fingers, also in landscape/

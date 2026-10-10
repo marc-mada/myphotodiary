@@ -15,7 +15,7 @@
 
 services:
   myphotodiary:
-    image: ghcr.io/marc-mada/myphotodiary:2.10.3
+    image: ghcr.io/marc-mada/myphotodiary:2.10.4
     container_name: myphotodiary
     restart: unless-stopped
     # The user that owns the data folder on this machine (see the guide).

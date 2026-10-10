@@ -7,7 +7,7 @@ notices and full license texts are the ones published by each project (at
 the address given, or inside the component itself - every backend library
 jar carries its own license and notice files).
 
-This list covers myPhotoDiary 2.10.3 and was generated from the build's
+This list covers myPhotoDiary 2.10.4 and was generated from the build's
 actual dependencies, not written by hand. To regenerate it:
 
 ```bash

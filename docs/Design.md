@@ -762,7 +762,8 @@ for the full rationale)
 - Picture zoom (single-image screen): done by `MobileImageViewer` itself
   (CSS transform on `.mobile-zoom-layer`, pinch to zoom 1x-2x around the
   fingers, one-finger pan clamped to the picture's edges, reset on picture
-  change/resize), not by the browser's page zoom - which magnified the
+  change/resize; a horizontal swipe that starts with the picture already
+  against that edge goes to the next/previous picture), not by the browser's page zoom - which magnified the
   overlaid corner bars too, and isn't available in element full-screen.
   Page zoom is blocked on the home page (`touch-action: pan-x pan-y`,
   plus `useBlockNativePageZoom` for iOS gesture events); other mobile
