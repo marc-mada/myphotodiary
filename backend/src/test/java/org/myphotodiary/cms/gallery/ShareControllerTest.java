@@ -23,6 +23,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 
@@ -37,10 +38,13 @@ import org.myphotodiary.cms.gallery.dto.ImageResponse;
 import org.myphotodiary.cms.gallery.dto.PublicImageResponse;
 import org.myphotodiary.cms.gallery.dto.PublicSequenceResponse;
 import org.myphotodiary.cms.gallery.dto.ShareLinkResponse;
+import org.myphotodiary.cms.settings.AppSettingsService;
 import org.myphotodiary.cms.user.UserService;
 import org.myphotodiary.cms.user.dto.CreateUserRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -77,6 +81,8 @@ class ShareControllerTest {
 	private ImageRepository imageRepository;
 	@Autowired
 	private UserService userService;
+	@Autowired
+	private AppSettingsService appSettingsService;
 
 	private Long directoryId;
 	private Authentication auth;
@@ -134,7 +140,7 @@ class ShareControllerTest {
 	}
 
 	@Test
-	void sequenceShareToken_excludesVideoFromTheListing() {
+	void sequenceShareToken_excludesVideoFromTheListing_whenVideoSharingIsOff() {
 		Directory directory = directoryRepository.findById(directoryId).orElseThrow();
 		imageRepository.save(new Image("clip.mp4", directory, LocalDateTime.now(), MediaType.VIDEO));
 
@@ -154,11 +160,55 @@ class ShareControllerTest {
 	}
 
 	@Test
-	void imageShareToken_rejectsVideoOutright() {
+	void imageShareToken_rejectsVideo_whenVideoSharingIsOff() {
 		Directory directory = directoryRepository.findById(directoryId).orElseThrow();
 		Image video = imageRepository.save(new Image("clip.mp4", directory, LocalDateTime.now(), MediaType.VIDEO));
 
 		assertThatThrownBy(() -> shareController.imageShareToken(auth, video.getId())).isInstanceOf(IllegalArgumentException.class);
+	}
+
+	/**
+	 * Video sharing allowed (14/10/2026, app-wide setting): a video gets a
+	 * link, is listed in its shared sequence with a stream URL, and streams
+	 * with Range support; turning the setting off stops links already sent.
+	 */
+	@Test
+	void videoSharing_whenAllowed_sharesAndStreams_andTurningItOffStopsExistingLinks() throws IOException {
+		appSettingsService.updateAllowVideoSharing(true);
+		Directory directory = directoryRepository.findById(directoryId).orElseThrow();
+		byte[] bytes = new byte[5000];
+		for (int i = 0; i < bytes.length; i++) bytes[i] = (byte) i;
+		Files.write(storageRoot.resolve(directory.getPath()).resolve("clip.mp4"), bytes);
+		Image video = imageRepository.save(new Image("clip.mp4", directory, LocalDateTime.now(), MediaType.VIDEO));
+
+		ShareLinkResponse imageLink = shareController.imageShareToken(auth, video.getId());
+		ShareLinkResponse sequenceLink = shareController.sequenceShareToken(auth, directoryId);
+		PublicSequenceResponse sequence = shareController.publicSequence(directoryId, sequenceLink.token());
+		assertThat(sequence.images()).extracting(PublicImageResponse::id).containsExactly(video.getId());
+		assertThat(sequence.images().get(0).streamUrl()).isEqualTo("/api/public/images/" + video.getId() + "/stream?token=" + sequenceLink.token());
+
+		var whole = shareController.publicStream(video.getId(), imageLink.token(), new HttpHeaders());
+		assertThat(whole.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(whole.getBody().getCount()).isEqualTo(5000);
+		HttpHeaders range = new HttpHeaders();
+		range.set(HttpHeaders.RANGE, "bytes=100-199");
+		var part = shareController.publicStream(video.getId(), sequenceLink.token(), range);
+		assertThat(part.getStatusCode()).isEqualTo(HttpStatus.PARTIAL_CONTENT);
+		assertThat(part.getBody().getPosition()).isEqualTo(100);
+		assertThat(part.getBody().getCount()).isEqualTo(100);
+
+		appSettingsService.updateAllowVideoSharing(false);
+		assertThatThrownBy(() -> shareController.publicStream(video.getId(), imageLink.token(), new HttpHeaders())).isInstanceOf(InvalidShareTokenException.class);
+		assertThat(shareController.publicSequence(directoryId, sequenceLink.token()).images()).isEmpty();
+	}
+
+	@Test
+	void publicStream_refusesAPicture() throws IOException {
+		appSettingsService.updateAllowVideoSharing(true);
+		ImageResponse picture = galleryService.uploadImage(auth, directoryId, jpegFile("still.jpg"));
+		ShareLinkResponse link = shareController.imageShareToken(auth, picture.id());
+
+		assertThatThrownBy(() -> shareController.publicStream(picture.id(), link.token(), new HttpHeaders())).isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test

@@ -23,6 +23,7 @@ import java.util.Optional;
 
 import org.myphotodiary.cms.gallery.ShareTokenService.ShareScope;
 import org.myphotodiary.cms.gallery.ShareTokenService.ShareTokenClaims;
+import org.myphotodiary.cms.settings.AppSettingsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -85,6 +86,7 @@ public class ShareLinkPreviewController {
 	private final ShareTokenService tokenService;
 	private final SharedSearchService sharedSearchService;
 	private final String configuredPublicBaseUrl;
+	private final AppSettingsService appSettingsService;
 
 	public ShareLinkPreviewController(
 			GalleryService galleryService,
@@ -92,13 +94,15 @@ public class ShareLinkPreviewController {
 			ImageRepository imageRepository,
 			ShareTokenService tokenService,
 			SharedSearchService sharedSearchService,
-			@Value("${app.public-base-url:}") String configuredPublicBaseUrl) {
+			@Value("${app.public-base-url:}") String configuredPublicBaseUrl,
+			AppSettingsService appSettingsService) {
 		this.galleryService = galleryService;
 		this.directoryRepository = directoryRepository;
 		this.imageRepository = imageRepository;
 		this.tokenService = tokenService;
 		this.sharedSearchService = sharedSearchService;
 		this.configuredPublicBaseUrl = configuredPublicBaseUrl;
+		this.appSettingsService = appSettingsService;
 	}
 
 	@GetMapping(value = "/share/image/{imageId}", produces = MediaType.TEXT_HTML_VALUE)
@@ -117,11 +121,11 @@ public class ShareLinkPreviewController {
 		String base = publicBaseUrl(request);
 		String encodedToken = URLEncoder.encode(token, StandardCharsets.UTF_8);
 		String pageUrl = base + "/share/image/" + image.getId() + "?token=" + encodedToken;
-		// A video has no "web" derivative to point og:image at (ShareController's
-		// own javadoc on why video is out of scope here) - the generic app icon
-		// stays, same as an image-less sequence below.
+		// A video has no "web" derivative: its preview is the frame stored as
+		// its thumbnail, served only while video sharing is allowed (14/10/2026,
+		// ShareController's javadoc) - otherwise the generic app icon stays.
 		String ogImageUrl = image.getMediaType() == org.myphotodiary.cms.gallery.MediaType.VIDEO
-				? null
+				? (appSettingsService.isVideoSharingAllowed() ? base + "/api/public/images/" + image.getId() + "/thumbnail?token=" + encodedToken : null)
 				: base + "/api/public/images/" + image.getId() + "/web?token=" + encodedToken;
 		return renderHtml(pageUrl, ogImageUrl);
 	}

@@ -121,6 +121,7 @@ export function ConfigPanel({ selfOnly = false }) {
 	const [maxVideoSizeMb, setMaxVideoSizeMb] = useState(20);
 	const [targetUploadSeconds, setTargetUploadSeconds] = useState(10);
 	const [maxShareSize, setMaxShareSize] = useState(50);
+	const [allowVideoSharing, setAllowVideoSharing] = useState(false);
 	const [savingVideoSize, setSavingVideoSize] = useState(false);
 	const [videoSizeError, setVideoSizeError] = useState(null);
 	const reportVideoSizeError = useForbiddenAwareError(setVideoSizeError);
@@ -138,6 +139,7 @@ export function ConfigPanel({ selfOnly = false }) {
 				setMaxVideoSizeMb(Math.round(settings.maxVideoSizeBytes / (1024 * 1024)));
 				setTargetUploadSeconds(settings.targetUploadSeconds);
 				setMaxShareSize(settings.maxShareSize);
+				setAllowVideoSharing(settings.allowVideoSharing);
 			})
 			.catch(reportVideoSizeError);
 		// Non-critical label - a failure just leaves it hidden rather than
@@ -211,10 +213,12 @@ export function ConfigPanel({ selfOnly = false }) {
 				maxVideoSizeBytes: Math.round(Number(maxVideoSizeMb) * 1024 * 1024),
 				targetUploadSeconds: Math.round(Number(targetUploadSeconds)),
 				maxShareSize: Math.round(Number(maxShareSize)),
+				allowVideoSharing,
 			});
 			setMaxVideoSizeMb(Math.round(settings.maxVideoSizeBytes / (1024 * 1024)));
 			setTargetUploadSeconds(settings.targetUploadSeconds);
 			setMaxShareSize(settings.maxShareSize);
+			setAllowVideoSharing(settings.allowVideoSharing);
 			// So this tab's next upload uses the new target, not the cached one.
 			invalidateTargetUploadSeconds();
 		} catch (err) {
@@ -314,6 +318,12 @@ export function ConfigPanel({ selfOnly = false }) {
 					<label>
 						{t('config.maxShareSize')}
 						<input type="number" min={1} max={1000} step={1} value={maxShareSize} onChange={(e) => setMaxShareSize(e.target.value)} />
+					</label>
+					{/* Videos in share links (14/10/2026) - off by default: a shared
+					    video is streamed in full to anyone holding the link. */}
+					<label className="config-checkbox">
+						<input type="checkbox" checked={allowVideoSharing} onChange={(e) => setAllowVideoSharing(e.target.checked)} />
+						{t('config.allowVideoSharing')}
 					</label>
 					{videoSizeError && <p className="form-error">{videoSizeError}</p>}
 					<button type="submit" disabled={savingVideoSize}>

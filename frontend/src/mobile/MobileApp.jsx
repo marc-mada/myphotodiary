@@ -20,6 +20,7 @@ import { useAuth } from '../auth/AuthContext';
 import { galleryApi } from '../api/gallery';
 import { attributeApi, directoryTreeApi, searchApi } from '../api/navigation';
 import { shareApi } from '../api/share';
+import { appSettingsApi } from '../api/appSettings';
 import { copyTextToClipboard } from '../clipboard';
 import { MobileIcon } from './MobileIcon';
 import { MobileImageViewer } from './MobileImageViewer';
@@ -73,6 +74,14 @@ import { useForbiddenAwareError } from '../temporaryMessage';
  */
 export function MobileApp() {
 	const { t } = useTranslation();
+	// Whether share links may include videos (app-wide setting, 14/10/2026).
+	const [videoSharingAllowed, setVideoSharingAllowed] = useState(false);
+	useEffect(() => {
+		appSettingsApi
+			.get()
+			.then((settings) => setVideoSharingAllowed(settings.allowVideoSharing))
+			.catch(() => setVideoSharingAllowed(false));
+	}, []);
 	const { logout } = useAuth();
 	const [currentPath, setCurrentPath] = useState('');
 	const [subdirectories, setSubdirectories] = useState([]);
@@ -635,7 +644,7 @@ export function MobileApp() {
 				onShareImage={handleShareImage}
 				onShareSequence={searchActive ? handleShareSearchResult : handleShareSequence}
 				sequenceLabel={searchActive ? t('mobile.shareSearchResult') : undefined}
-				canShareImage={currentImage != null && currentImage.mediaType !== 'VIDEO'}
+				canShareImage={currentImage != null && (currentImage.mediaType !== 'VIDEO' || videoSharingAllowed)}
 				canShareSequence={searchActive ? images.length > 0 && lastSearchFilters != null : activeDirectory != null}
 				busy={shareBusy}
 				error={shareError}

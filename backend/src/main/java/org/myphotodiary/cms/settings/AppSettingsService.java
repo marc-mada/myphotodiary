@@ -68,6 +68,24 @@ public class AppSettingsService {
 		return settings;
 	}
 
+	/**
+	 * Whether share links may include videos (14/10/2026, explicit ask -
+	 * "video sharing links conditioned by a global configuration parameter").
+	 * Checked on every public request, not only when a link is created:
+	 * turning it off stops the videos of links already sent from playing.
+	 */
+	@Transactional(readOnly = true)
+	public boolean isVideoSharingAllowed() {
+		return get().isAllowVideoSharing();
+	}
+
+	@Transactional
+	public AppSettings updateAllowVideoSharing(boolean allowVideoSharing) {
+		AppSettings settings = get();
+		settings.setAllowVideoSharing(allowVideoSharing);
+		return settings;
+	}
+
 	public static final int MIN_MAX_SHARE_SIZE = 1;
 	public static final int MAX_MAX_SHARE_SIZE = 1000;
 

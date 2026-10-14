@@ -160,9 +160,26 @@ export function DirectoryDetailPanel({ directory, allAttributes, assignableGroup
 		}
 		setRenameError(null);
 		try {
-			await onRename(name, date);
+			await onRename(name, date, false);
 			setRenaming(false);
 		} catch (err) {
+			// The new name/date is an existing sequence (10/10/2026, explicit
+			// ask): ask, and on OK merge this sequence into it.
+			if (err.status === 409 && err.data?.code === 'SEQUENCE_EXISTS') {
+				const d = err.data;
+				let message = t('directoryDetail.mergeConfirm', { path: d.targetPath, targetCount: d.targetImageCount, sourceCount: d.sourceImageCount });
+				if (d.targetGroup && d.targetGroup !== d.sourceGroup) {
+					message += '\n\n' + t('directoryDetail.mergeGroupWarning', { targetGroup: d.targetGroup, sourceGroup: d.sourceGroup });
+				}
+				if (!window.confirm(message)) return;
+				try {
+					await onRename(name, date, true);
+					setRenaming(false);
+				} catch (mergeErr) {
+					reportRenameError(mergeErr);
+				}
+				return;
+			}
 			// Shown right here, under the fields (e.g. "already exists"),
 			// rather than behind the popup on the screen itself.
 			reportRenameError(err);

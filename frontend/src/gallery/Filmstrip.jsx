@@ -120,9 +120,42 @@ export function Filmstrip({ images, currentId, onSelect, onEndReached, hasMore, 
 	// down to be seen, the rail scrolls itself so the selection re-centers -
 	// a direct ask, not just "scrolls into view" (block: 'nearest' would
 	// only just barely reveal it at the edge instead).
+	//
+	// Keeps following the selection while the thumbnails above it load
+	// (11/10/2026 fix, reported: "Go to this sequence in Gallery" from Search
+	// showed the right picture but left the filmstrip at the top). A not-yet-
+	// loaded thumbnail has no height, so a sequence opened directly on a
+	// picture far down first scrolled with everything above it collapsed,
+	// then those thumbnails loaded, grew, and pushed the selection out of
+	// view. Re-centred on every size change of the thumbnail column until
+	// the user scrolls the strip themselves (wheel, touch, scrollbar drag).
+	const followSelectionRef = useRef(true);
 	useEffect(() => {
+		followSelectionRef.current = true;
 		selectedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}, [currentId]);
+
+	useEffect(() => {
+		const sidebar = sidebarRef.current;
+		const realThumbs = realThumbsRef.current;
+		if (!sidebar || !realThumbs || typeof ResizeObserver === 'undefined') return;
+		const stopFollowing = () => {
+			followSelectionRef.current = false;
+		};
+		const observer = new ResizeObserver(() => {
+			if (followSelectionRef.current) selectedRef.current?.scrollIntoView({ block: 'center' });
+		});
+		observer.observe(realThumbs);
+		sidebar.addEventListener('wheel', stopFollowing, { passive: true });
+		sidebar.addEventListener('touchstart', stopFollowing, { passive: true });
+		sidebar.addEventListener('mousedown', stopFollowing);
+		return () => {
+			observer.disconnect();
+			sidebar.removeEventListener('wheel', stopFollowing);
+			sidebar.removeEventListener('touchstart', stopFollowing);
+			sidebar.removeEventListener('mousedown', stopFollowing);
+		};
+	}, []);
 
 	useEffect(() => {
 		if (!onEndReached) return;

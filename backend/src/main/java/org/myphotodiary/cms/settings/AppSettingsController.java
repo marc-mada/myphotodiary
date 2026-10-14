@@ -60,6 +60,9 @@ public class AppSettingsController {
 		if (request.maxShareSize() != null) {
 			service.updateMaxShareSize(request.maxShareSize());
 		}
+		if (request.allowVideoSharing() != null) {
+			service.updateAllowVideoSharing(request.allowVideoSharing());
+		}
 		return AppSettingsResponse.from(service.get());
 	}
 }

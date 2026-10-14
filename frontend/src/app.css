@@ -318,6 +318,20 @@ button:hover {
 	width: 8rem;
 }
 
+/* A checkbox setting (video sharing, 14/10/2026): box and label on one
+   line, the full width of the form so the long label doesn't squeeze the
+   number fields. */
+.config-panel-form label.config-checkbox {
+	flex-direction: row;
+	align-items: center;
+	gap: 0.5rem;
+	width: 100%;
+}
+
+.config-panel-form label.config-checkbox input {
+	width: auto;
+}
+
 /* App-wide settings (28/08/2026, video support) - a second, visually
    distinct .config-panel-form box (own white surface, own margin-top
    already applied generically above) so it doesn't read as one more field

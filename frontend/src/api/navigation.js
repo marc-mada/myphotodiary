@@ -50,8 +50,14 @@ export const directoryTreeApi = {
 
 	// `date` ({year, month}, optional - 05/10/2026): also move a year/month/name
 	// sequence to another date (DirectoryIndexerService.renameDirectory).
-	rename: (directoryId, newName, date = null) =>
-		apiFetch(`/api/directories/${directoryId}/rename`, { method: 'POST', body: { newName, year: date?.year ?? null, month: date?.month ?? null } }),
+	// `merge` (10/10/2026): the target is an existing sequence and the user
+	// confirmed merging into it - without it that case answers 409
+	// (code SEQUENCE_EXISTS, with picture counts and groups).
+	rename: (directoryId, newName, date = null, merge = false) =>
+		apiFetch(`/api/directories/${directoryId}/rename`, {
+			method: 'POST',
+			body: { newName, year: date?.year ?? null, month: date?.month ?? null, merge: merge || null },
+		}),
 
 	// Every directory under `path` (root if omitted), flattened - powers the
 	// Admin screen's bulk index-management table (legacy's dirIndexPane).

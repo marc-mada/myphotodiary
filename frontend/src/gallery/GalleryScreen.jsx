@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { galleryApi } from '../api/gallery';
 import { attributeApi, directoryTreeApi, groupApi, meApi } from '../api/navigation';
 import { shareApi } from '../api/share';
+import { appSettingsApi } from '../api/appSettings';
 import { copyTextToClipboard } from '../clipboard';
 import { DirectoryDetailPanel } from './DirectoryDetailPanel';
 import { DirectoryTree } from './DirectoryTree';
@@ -56,6 +57,14 @@ import { useForbiddenAwareError } from '../temporaryMessage';
  */
 export function GalleryScreen({ initialTarget, onInitialTargetConsumed }) {
 	const { t } = useTranslation();
+	// Whether share links may include videos (app-wide setting, 14/10/2026).
+	const [videoSharingAllowed, setVideoSharingAllowed] = useState(false);
+	useEffect(() => {
+		appSettingsApi
+			.get()
+			.then((settings) => setVideoSharingAllowed(settings.allowVideoSharing))
+			.catch(() => setVideoSharingAllowed(false));
+	}, []);
 	// '' (root) is the default selection, not null/"nothing selected" - a
 	// direct ask: the pictures published directly at the root (above every
 	// year) should already be showing right after sign-in, not require
@@ -321,9 +330,10 @@ export function GalleryScreen({ initialTarget, onInitialTargetConsumed }) {
 
 	// Errors are not caught here (05/10/2026): DirectoryDetailPanel shows
 	// them under its own fields, rather than behind the popup.
-	async function handleRenameDirectory(newName, date) {
+	// `merge`: confirmed merge into an existing sequence (DirectoryDetailPanel).
+	async function handleRenameDirectory(newName, date, merge) {
 		setError(null);
-		const renamed = await directoryTreeApi.rename(directory.id, newName, date);
+		const renamed = await directoryTreeApi.rename(directory.id, newName, date, merge);
 		setSelectedPath(renamed.path);
 		setDirectory(renamed);
 		setOpenPopup(null);
@@ -527,6 +537,7 @@ export function GalleryScreen({ initialTarget, onInitialTargetConsumed }) {
 							onDelete={handleDeleteImage}
 							onNavigateUp={handleNavigateUp}
 							onCopyImageLink={handleCopyImageLink}
+							videoSharingAllowed={videoSharingAllowed}
 							onCopySequenceLink={handleCopySequenceLink}
 							onOpenEditor={currentImage && currentImage.mediaType !== 'VIDEO' ? () => setOpenPopup('editor') : undefined}
 							disableShortcuts={openPopup !== null}

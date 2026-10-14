@@ -89,38 +89,7 @@ public class VideoController {
 		}
 		Image image = requireVideo(imageId);
 
-		Path path = storageService.resolveOriginal(image.getDirectory().getPath(), image.getName());
-		FileSystemResource resource = new FileSystemResource(path);
-		long contentLength;
-		try {
-			contentLength = resource.contentLength();
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}
-		// Always video/mp4, never derived from the original file's own
-		// extension (MediaTypeFactory.getMediaType, removed 03/09/2026) - a
-		// real bug found live on iPad: a `.mov` upload (see ImportService's
-		// own VIDEO_EXTENSIONS comment) was served as `video/quicktime`
-		// instead, which Safari plays natively but Chrome/Firefox generally
-		// don't, regardless of the actual codec inside. VideoFormatValidator
-		// already guarantees every stored video is H.264(+AAC) - universally
-		// playable as `video/mp4` - independent of whatever container
-		// extension the original upload happened to arrive with, so the
-		// original extension was never the right signal for this header to
-		// begin with.
-		MediaType contentType = MediaType.valueOf("video/mp4");
-
-		List<HttpRange> ranges = headers.getRange();
-		if (ranges.isEmpty()) {
-			// No Range header yet - the browser's very first request for this
-			// URL. Serve the whole thing but advertise Range support, so it
-			// knows to send byte-range requests for subsequent seeks instead
-			// of re-downloading from the start.
-			ResourceRegion region = new ResourceRegion(resource, 0, contentLength);
-			return ResponseEntity.ok().header("Accept-Ranges", "bytes").contentType(contentType).body(region);
-		}
-		ResourceRegion region = ranges.get(0).toResourceRegion(resource);
-		return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT).header("Accept-Ranges", "bytes").contentType(contentType).body(region);
+		return VideoRangeResponses.serve(storageService.resolveOriginal(image.getDirectory().getPath(), image.getName()), headers);
 	}
 
 	private Image requireVideo(Long imageId) {

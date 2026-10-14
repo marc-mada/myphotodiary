@@ -157,6 +157,16 @@ public class Image {
 		this.longitude = longitude;
 	}
 
+	/**
+	 * Moves this picture's row to another sequence, possibly renamed (a
+	 * sequence merge, 10/10/2026 - DirectoryIndexerService#renameDirectory).
+	 * The files themselves are moved by ImageStorageService#moveImageFiles.
+	 */
+	public void moveTo(Directory directory, String name) {
+		this.directory = directory;
+		this.name = name;
+	}
+
 	public Directory getDirectory() {
 		return directory;
 	}

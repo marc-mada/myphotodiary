@@ -69,4 +69,13 @@ class AppSettingsControllerTest {
 		assertThat(controller.get().targetUploadSeconds()).isEqualTo(10);
 		assertThatThrownBy(() -> controller.update(new UpdateAppSettingsRequest(null, 30, null))).isInstanceOf(AccessDeniedException.class);
 	}
+
+	@Test
+	@org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
+	void allowVideoSharing_isOffByDefault_andCanBeTurnedOn() {
+		assertThat(controller.get().allowVideoSharing()).isFalse();
+		assertThat(controller.update(new UpdateAppSettingsRequest(null, null, null, true)).allowVideoSharing()).isTrue();
+		assertThat(controller.update(new UpdateAppSettingsRequest(null, null, null, false)).allowVideoSharing()).isFalse();
+	}
+
 }

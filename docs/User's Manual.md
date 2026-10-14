@@ -204,10 +204,30 @@ sequence's own path:
     it disappears from the tree.
 
   A date that isn't `MM/YYYY` (a month from 01 to 12 — `8/2026` is fine
-  too) shows an error and nothing is moved, as does a sequence with the
-  same name already in the target month. Moving doesn't change the
+  too) shows an error and nothing is moved. Moving doesn't change the
   pictures' own capture dates (recorded by the camera). The Date field
   only appears for a sequence filed as `year/month/name`.
+
+  **Merging two sequences**: if a sequence with the new name already
+  exists (in the same month, or in the new month), you're asked whether
+  to merge into it, with the number of pictures on each side. **Cancel**
+  changes nothing. **OK** moves all of this sequence's pictures, with
+  their comments, ratings and tags, into the existing sequence, then
+  removes this one:
+  - a picture whose file name is already used there gets a suffix
+    (`IMG_1234.jpg` becomes `IMG_1234-2.jpg`), so nothing is overwritten;
+  - the existing sequence keeps its own comment, followed by this one's;
+    the tags of both are combined; its group, location and date stay,
+    unless it had none;
+  - if the two sequences are in different groups, the message says so:
+    the moved pictures take the existing sequence's group, which can
+    change who sees them;
+  - sub-sequences move too, but the merge is refused if both have a
+    sub-sequence with the same name;
+  - links shared to the removed sequence stop working (links to its
+    pictures keep working).
+
+  Merging needs the right to edit both sequences.
 
 <figure>
 <img src="images/desktop-sequence-comment-rename.png" alt="The Rename fields: renaming a sequence and moving it to another month">
@@ -546,9 +566,14 @@ A few things worth knowing before sending a link:
 - There's no way to revoke a link early once it's been sent, short of
   deleting the picture or sequence itself — if you shared the wrong
   thing, treat the link as compromised for the rest of its 30 days.
-- **Videos can't be shared.** A picture link can't be created for a
-  video at all, and sequence and search result links simply leave any
-  videos out of what the recipient sees.
+- **Videos are shared only if an Admin allows it** (Admin → Configure →
+  *Allow sharing videos by link*, off by default — §11). While it's off,
+  the picture-link button doesn't appear on a video, and sequence and
+  search result links leave videos out. While it's on, a video gets a
+  link like a picture, appears in shared sequences and search results,
+  and plays in the recipient's browser, streamed from your server.
+  Turning the setting off again also stops the videos of links already
+  sent (their pictures keep working).
 
 ## 7. Desktop: Sequence Geolocation
 
@@ -670,6 +695,10 @@ Two independent forms:
   - **Maximum pictures in a shared search result** — above it, only the
     first ones are shared, with a warning to the person sharing (§6).
     50 by default.
+  - **Allow sharing videos by link** — off by default. When ticked,
+    videos can be shared like pictures (§6). A shared video is the
+    original file, streamed from your server to anyone who has the link
+    for its 30 days — think of your bandwidth before turning it on.
 
 Under these two boxes, a line shows the **version of myPhotoDiary
 running on the server** — useful to check that an upgrade really took
@@ -877,9 +906,9 @@ image** or **Share current sequence**. Either one creates the same kind
 of 30-day link as on desktop (§6) and hands it straight to your phone's
 own share sheet — pick WhatsApp, Messages, email, or any other app from
 there. On a browser that has no share sheet, the link is copied to the
-clipboard instead, and a "Link copied!" message confirms it. Videos
-can't be shared (§6), so **Share current image** is disabled while a
-video is showing.
+clipboard instead, and a "Link copied!" message confirms it. Unless an
+Admin has allowed video sharing (§6), **Share current image** is
+disabled while a video is showing.
 
 While you're browsing a **search result** (§12), the second choice
 becomes **Share search result**: it shares the whole result, with the

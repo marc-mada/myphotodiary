@@ -258,8 +258,13 @@ public class DirectoryIndexerService {
 				latestImageDate = (latestImageDate == null || day.isAfter(latestImageDate)) ? day : latestImageDate;
 			}
 		}
+		// Only a row whose original file is really gone is removed. The
+		// on-disk listing above only covers picture extensions, so an
+		// uploaded video (still on disk) must not count as gone - before
+		// 14/10/2026 re-indexing deleted every video's row AND its file
+		// (storageService.delete below removes the original too).
 		for (Image image : indexedByName.values()) {
-			if (!onDiskNames.contains(image.getName())) {
+			if (!onDiskNames.contains(image.getName()) && !storageService.fileExists(normalized, image.getName())) {
 				storageService.delete(normalized, image.getName()); // clears any leftover thumbnail; the original is already gone
 				imageRepository.delete(image);
 			}
@@ -344,8 +349,20 @@ public class DirectoryIndexerService {
 			return DirectoryResponse.from(directory); // nothing changed
 		}
 
-		if (directoryRepository.findByPath(newPath).isPresent()) {
-			throw new DirectoryAlreadyExistsException(newPath);
+		Optional<Directory> existingTarget = directoryRepository.findByPath(newPath);
+		if (existingTarget.isPresent() || storageService.directoryExists(newPath)) {
+			// Already another sequence (or a folder on disk): merge into it,
+			// but only once the user has confirmed (10/10/2026, explicit ask).
+			if (!Boolean.TRUE.equals(request.merge())) {
+				throw new SequenceMergeRequiredException(newPath,
+						imageRepository.findByDirectory_IdOrderByNameAsc(directory.getId()).size(),
+						existingTarget.map(t -> (long) imageRepository.findByDirectory_IdOrderByNameAsc(t.getId()).size()).orElse(0L),
+						directory.getGroup().getGroupName(),
+						existingTarget.map(t -> t.getGroup().getGroupName()).orElse(null));
+			}
+			Directory target = mergeInto(authentication, directory, newPath, existingTarget);
+			removeEmptyParents(oldParentPath, parentPath);
+			return DirectoryResponse.from(target);
 		}
 		storageService.renameDirectory(oldPath, newPath); // throws if the target already exists on disk
 
@@ -357,20 +374,123 @@ public class DirectoryIndexerService {
 		}
 		directory.setPath(newPath);
 
-		// Moved to another date: the old month folder (then year folder) is
-		// removed if nothing at all is left in it, so the tree doesn't keep
-		// an empty branch - never one that is a sequence of its own (has a
-		// Directory row), even if empty.
-		if (!parentPath.equals(oldParentPath)) {
-			String emptyCandidate = oldParentPath;
-			while (!emptyCandidate.isEmpty()
-					&& directoryRepository.findByPath(emptyCandidate).isEmpty()
-					&& storageService.deleteDirectoryIfEmpty(emptyCandidate)) {
-				emptyCandidate = emptyCandidate.contains("/") ? emptyCandidate.substring(0, emptyCandidate.lastIndexOf('/')) : "";
-			}
+		removeEmptyParents(oldParentPath, parentPath);
+		return DirectoryResponse.from(directory);
+	}
+
+	// Moved to another date: the old month folder (then year folder) is
+	// removed if nothing at all is left in it, so the tree doesn't keep an
+	// empty branch - never one that is a sequence of its own (has a
+	// Directory row), even if empty.
+	private void removeEmptyParents(String oldParentPath, String newParentPath) {
+		if (newParentPath.equals(oldParentPath)) {
+			return;
+		}
+		String emptyCandidate = oldParentPath;
+		while (!emptyCandidate.isEmpty()
+				&& directoryRepository.findByPath(emptyCandidate).isEmpty()
+				&& storageService.deleteDirectoryIfEmpty(emptyCandidate)) {
+			emptyCandidate = emptyCandidate.contains("/") ? emptyCandidate.substring(0, emptyCandidate.lastIndexOf('/')) : "";
+		}
+	}
+
+	/**
+	 * Merges {@code source} into the sequence at {@code targetPath}
+	 * (10/10/2026, explicit ask - renaming a sequence to an existing one's
+	 * name, once confirmed). Needs the same right as a rename on both
+	 * sequences (EDIT_SEQUENCE; explicit choice, nothing is deleted).
+	 * <ul>
+	 * <li>Every picture moves, with its thumbnail/web copies and everything
+	 * attached to its row (comment, rating, tags, date, shared-search
+	 * membership - same row id). A file name already used in the target
+	 * gets a suffix ({@code IMG_1234-2.jpg}; explicit choice: keep both).</li>
+	 * <li>Files on disk without a row, and sub-sequences, move too; a
+	 * sub-sequence name present in both is refused before anything moves.</li>
+	 * <li>The target keeps its own group, location and date; a missing one
+	 * is taken from the source. The source's comment is appended if
+	 * different, tags are combined.</li>
+	 * <li>The source sequence is then removed (its row and its now-empty
+	 * folder); links shared to it stop working.</li>
+	 * </ul>
+	 * A target folder with no row yet (dropped on disk, never browsed) is
+	 * indexed first, in the source's group.
+	 */
+	private Directory mergeInto(Authentication authentication, Directory source, String targetPath, Optional<Directory> existingTarget) {
+		String sourcePath = source.getPath();
+		if (targetPath.startsWith(sourcePath + "/")) {
+			throw new IllegalArgumentException("Cannot merge a sequence into its own sub-sequence");
+		}
+		List<String> sharedSubSequences = new ArrayList<>(storageService.listSubdirectoryNames(sourcePath));
+		sharedSubSequences.retainAll(storageService.listSubdirectoryNames(targetPath));
+		if (!sharedSubSequences.isEmpty()) {
+			throw new IllegalArgumentException("Cannot merge: both sequences contain a sub-sequence named " + String.join(", ", sharedSubSequences));
 		}
 
-		return DirectoryResponse.from(directory);
+		Directory target = existingTarget.orElseGet(() -> storageService.listImageFileNames(targetPath).isEmpty()
+				? directoryRepository.save(new Directory(targetPath, source.getGroup(), LocalDate.now()))
+				: requireDirectory(indexDirectory(targetPath, source.getGroup().getGroupName()).id()));
+		authorizationService.checkAuthorization(authentication, target.getGroup(), Action.EDIT_SEQUENCE);
+
+		// Pictures with a row: files and row move together.
+		Set<String> movedFileNames = new java.util.HashSet<>();
+		for (Image image : imageRepository.findByDirectory_IdOrderByNameAsc(source.getId())) {
+			String newName = freeName(target, targetPath, image.getName());
+			storageService.moveImageFiles(sourcePath, image.getName(), targetPath, newName, image.getMediaType());
+			movedFileNames.add(image.getName());
+			image.moveTo(target, newName);
+			imageRepository.saveAndFlush(image); // so the next freeName() sees this name as taken
+		}
+		// Any other visible file in the folder (not indexed): moved as-is.
+		for (String fileName : storageService.listFileNames(sourcePath)) {
+			if (!movedFileNames.contains(fileName)) {
+				storageService.moveFile(sourcePath, fileName, targetPath, freeName(target, targetPath, fileName));
+			}
+		}
+		// Sub-sequences: folder and rows follow.
+		for (String sub : storageService.listSubdirectoryNames(sourcePath)) {
+			storageService.renameDirectory(sourcePath + "/" + sub, targetPath + "/" + sub);
+		}
+		for (Directory descendant : directoryRepository.findByPathStartingWith(sourcePath + "/")) {
+			descendant.setPath(targetPath + descendant.getPath().substring(sourcePath.length()));
+		}
+
+		mergeDetails(source, target);
+		directoryRepository.delete(source);
+		directoryRepository.flush();
+		storageService.deleteMergedDirectory(sourcePath);
+		return target;
+	}
+
+	private void mergeDetails(Directory source, Directory target) {
+		String sourceText = source.getDescription() == null ? "" : source.getDescription().trim();
+		String targetText = target.getDescription() == null ? "" : target.getDescription().trim();
+		if (!sourceText.isEmpty() && !targetText.contains(sourceText)) {
+			target.setDescription(targetText.isEmpty() ? sourceText : targetText + "\n\n" + sourceText);
+		}
+		for (Attribute attribute : source.getAttributes()) {
+			if (!target.getAttributes().contains(attribute)) {
+				target.getAttributes().add(attribute);
+			}
+		}
+		if (target.getLatitude() == null && target.getLongitude() == null) {
+			target.setLatitude(source.getLatitude());
+			target.setLongitude(source.getLongitude());
+		}
+		if (target.getSequenceDate() == null) {
+			target.setSequenceDate(source.getSequenceDate());
+		}
+	}
+
+	/** {@code name}, or {@code base-2.ext}, {@code base-3.ext}... - the first not used in the target, neither by a picture row nor by a file on disk. */
+	private String freeName(Directory target, String targetPath, String name) {
+		int dot = name.lastIndexOf('.');
+		String base = dot > 0 ? name.substring(0, dot) : name;
+		String ext = dot > 0 ? name.substring(dot) : "";
+		String candidate = name;
+		for (int n = 2; imageRepository.existsByDirectory_IdAndName(target.getId(), candidate) || storageService.fileExists(targetPath, candidate); n++) {
+			candidate = base + "-" + n + ext;
+		}
+		return candidate;
 	}
 
 	private static final java.util.regex.Pattern DATED_SEQUENCE = java.util.regex.Pattern.compile("^\\d{4}/\\d{2}/[^/]+$");

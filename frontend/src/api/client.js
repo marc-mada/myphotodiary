@@ -35,9 +35,12 @@
  * those).
  */
 export class ApiError extends Error {
-	constructor(status, message) {
+	// `data`: the whole JSON error body, for the few errors that carry more
+	// than a message (e.g. a rename that needs a merge confirmation).
+	constructor(status, message, data = null) {
 		super(message);
 		this.status = status;
+		this.data = data;
 	}
 }
 
@@ -85,7 +88,7 @@ export async function apiFetch(path, { method = 'GET', body } = {}) {
 
 	if (!response.ok) {
 		const message = data?.error ?? `Request failed: ${response.status}`;
-		throw new ApiError(response.status, message);
+		throw new ApiError(response.status, message, data);
 	}
 
 	return data;

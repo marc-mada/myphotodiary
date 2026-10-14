@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { galleryApi } from '../api/gallery';
 import { attributeApi, directoryTreeApi, groupApi, meApi, searchApi } from '../api/navigation';
 import { shareApi } from '../api/share';
+import { appSettingsApi } from '../api/appSettings';
 import { copyTextToClipboard } from '../clipboard';
 import { DirectoryDetailPanel } from './DirectoryDetailPanel';
 import { Filmstrip } from './Filmstrip';
@@ -88,6 +89,14 @@ import { useForbiddenAwareError } from '../temporaryMessage';
  */
 export function SearchScreen({ onGoToDirectory }) {
 	const { t } = useTranslation();
+	// Whether share links may include videos (app-wide setting, 14/10/2026).
+	const [videoSharingAllowed, setVideoSharingAllowed] = useState(false);
+	useEffect(() => {
+		appSettingsApi
+			.get()
+			.then((settings) => setVideoSharingAllowed(settings.allowVideoSharing))
+			.catch(() => setVideoSharingAllowed(false));
+	}, []);
 	const [allAttributes, setAllAttributes] = useState([]);
 	const [selectedAttributes, setSelectedAttributes] = useState([]);
 	const [minRating, setMinRating] = useState('');
@@ -399,9 +408,16 @@ export function SearchScreen({ onGoToDirectory }) {
 	}
 
 	// Errors reach DirectoryDetailPanel, shown under its fields (05/10/2026).
-	async function handleRenameDirectory(newName, date) {
+	async function handleRenameDirectory(newName, date, merge) {
 		setError(null);
-		setDirectory(await directoryTreeApi.rename(directory.id, newName, date));
+		const oldId = directory.id;
+		const renamed = await directoryTreeApi.rename(directory.id, newName, date, merge);
+		setDirectory(renamed);
+		// After a merge the results' pictures now belong to the target
+		// sequence (the old one no longer exists).
+		if (renamed.id !== oldId) {
+			setImages((prev) => prev.map((img) => (img.directoryId === oldId ? { ...img, directoryId: renamed.id } : img)));
+		}
 		setOpenPopup(null);
 	}
 
@@ -633,6 +649,7 @@ export function SearchScreen({ onGoToDirectory }) {
 							onCopySequenceLink={handleShareSearchResult}
 							copySequenceLinkTitle={t('search.copySearchLink')}
 							onCopyImageLink={handleCopyImageLink}
+							videoSharingAllowed={videoSharingAllowed}
 							showCommentButton={false}
 							disableShortcuts={openPopup !== null}
 							slideShowIntervalMs={slideShowIntervalMs ?? undefined}

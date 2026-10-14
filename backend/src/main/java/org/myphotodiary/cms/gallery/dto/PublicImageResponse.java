@@ -39,6 +39,8 @@ public record PublicImageResponse(
 		String mediaType,
 		String thumbnailUrl,
 		String webUrl,
+		/** Public stream of a shared video (14/10/2026) - {@code null} for a picture. */
+		String streamUrl,
 		/** The picture's own sequence comment - only filled for a shared search result, whose pictures come from different sequences (04/10/2026); {@code null} otherwise. */
 		String sequenceDescription) {
 
@@ -57,6 +59,7 @@ public record PublicImageResponse(
 				image.getMediaType().name(),
 				base + "/thumbnail" + suffix,
 				base + "/web" + suffix,
+				image.getMediaType() == org.myphotodiary.cms.gallery.MediaType.VIDEO ? base + "/stream" + suffix : null,
 				withSequenceDescription ? image.getDirectory().getDescription() : null);
 	}
 }

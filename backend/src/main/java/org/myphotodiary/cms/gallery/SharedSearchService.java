@@ -43,7 +43,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <li><b>At most {@code maxShareSize} pictures</b> (app-wide setting,
  * default 50): above it, the first ones in search order are shared and the
  * response says the result was cut, so the sharer can be warned.</li>
- * <li><b>Videos left out</b>, as for sequence links (no public video
+ * <li><b>Videos left out unless video sharing is allowed</b> (14/10/2026,
+ * app-wide setting, see ShareController), as for sequence links (no public video
  * streaming).</li>
  * <li>Same 30-day lifetime as the other share links (also in the token).
  * Expired rows are cleaned up whenever a new result is shared.</li>
@@ -74,14 +75,15 @@ public class SharedSearchService {
 		if (!GalleryService.hasSearchCriteria(request.attributeNames(), request.minRating(), request.fromDate(), request.toDate(), request.text())) {
 			throw new IllegalArgumentException("A search result can only be shared once at least one search criterion is set");
 		}
+		boolean videoSharing = appSettingsService.isVideoSharingAllowed();
 		List<Long> shareable = galleryService
 				.searchMatches(authentication, request.attributeNames(), request.minRating(), request.fromDate(), request.toDate(), request.text())
 				.stream()
-				.filter(img -> img.getMediaType() != MediaType.VIDEO)
+				.filter(img -> videoSharing || img.getMediaType() != MediaType.VIDEO)
 				.map(Image::getId)
 				.toList();
 		if (shareable.isEmpty()) {
-			throw new IllegalArgumentException("This search has no picture to share (videos can't be shared)");
+			throw new IllegalArgumentException(videoSharing ? "This search has nothing to share" : "This search has no picture to share (video sharing is turned off)");
 		}
 		int max = appSettingsService.get().getMaxShareSize();
 		List<Long> frozen = shareable.size() > max ? shareable.subList(0, max) : shareable;
@@ -106,7 +108,7 @@ public class SharedSearchService {
 		return ids.stream()
 				.map(byId::get)
 				.filter(Objects::nonNull)
-				.filter(img -> img.getMediaType() != MediaType.VIDEO)
+				.filter(img -> img.getMediaType() != MediaType.VIDEO || appSettingsService.isVideoSharingAllowed())
 				.toList();
 	}
 

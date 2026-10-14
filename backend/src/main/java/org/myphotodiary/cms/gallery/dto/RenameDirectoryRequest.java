@@ -22,11 +22,20 @@ import jakarta.validation.constraints.NotBlank;
  * {@code year}/{@code month} (05/10/2026, optional, together): also move a
  * {@code year/month/name} sequence to another date - see
  * DirectoryIndexerService#renameDirectory.
+ *
+ * {@code merge} (10/10/2026, optional): when the new name/date is already
+ * taken by another sequence, merge into it instead of refusing. Without it
+ * the rename answers 409 with SequenceMergeRequiredException's details, so
+ * the user can be asked to confirm first.
  */
-public record RenameDirectoryRequest(@NotBlank String newName, Integer year, Integer month) {
+public record RenameDirectoryRequest(@NotBlank String newName, Integer year, Integer month, Boolean merge) {
 
 	public RenameDirectoryRequest(String newName) {
-		this(newName, null, null);
+		this(newName, null, null, null);
+	}
+
+	public RenameDirectoryRequest(String newName, Integer year, Integer month) {
+		this(newName, year, month, null);
 	}
 
 }

@@ -18,8 +18,8 @@ package org.myphotodiary.cms.settings.dto;
 
 import org.myphotodiary.cms.settings.AppSettings;
 
-public record AppSettingsResponse(long maxVideoSizeBytes, int targetUploadSeconds, int maxShareSize) {
+public record AppSettingsResponse(long maxVideoSizeBytes, int targetUploadSeconds, int maxShareSize, boolean allowVideoSharing) {
 	public static AppSettingsResponse from(AppSettings settings) {
-		return new AppSettingsResponse(settings.getMaxVideoSizeBytes(), settings.getTargetUploadSeconds(), settings.getMaxShareSize());
+		return new AppSettingsResponse(settings.getMaxVideoSizeBytes(), settings.getTargetUploadSeconds(), settings.getMaxShareSize(), settings.isAllowVideoSharing());
 	}
 }

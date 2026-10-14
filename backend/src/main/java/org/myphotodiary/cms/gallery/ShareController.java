@@ -26,6 +26,10 @@ import org.myphotodiary.cms.gallery.dto.SearchShareRequest;
 import org.myphotodiary.cms.gallery.dto.SearchShareResponse;
 import org.myphotodiary.cms.gallery.dto.PublicSequenceResponse;
 import org.myphotodiary.cms.gallery.dto.ShareLinkResponse;
+import org.myphotodiary.cms.settings.AppSettingsService;
+import org.springframework.core.io.support.ResourceRegion;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
@@ -59,14 +63,17 @@ import org.springframework.web.bind.annotation.RestController;
  * at all.</li>
  * </ul>
  *
- * Video is out of scope for this first pass, uniformly - the token-issuing
- * endpoint below rejects a video image outright, and {@code /public/images}
- * only ever exposes {@code webUrl}/{@code thumbnailUrl}, neither of which a
- * video actually has (no "web" derivative is ever generated for video,
- * {@link ImageStorageService#storeVideoFromTempFile}'s own doc) - publicly
- * streaming a video would need its own public, token-gated Range-request
- * endpoint mirroring {@link VideoController}, a meaningfully bigger surface
- * than reusing the already-public image endpoints here.
+ * Videos (14/10/2026, explicit ask): shared only when the app-wide setting
+ * {@code allowVideoSharing} is on (Admin -> Configure, off by default).
+ * Then a video gets an image-link token like a picture, appears in shared
+ * sequences and search results, and plays through
+ * {@code /api/public/images/{id}/stream} - the same Range-request serving as
+ * {@link VideoController}'s signed-in stream, gated by the share token
+ * instead. The setting is read on every public request, so turning it off
+ * also stops the videos of links already sent (their pictures keep
+ * working). Before 14/10/2026 video was out of scope entirely: a public
+ * video is the original file, served to anyone holding the link for 30
+ * days, a bigger exposure (bandwidth) than the picture endpoints.
  */
 @RestController
 public class ShareController {
@@ -77,6 +84,7 @@ public class ShareController {
 	private final ImageStorageService storageService;
 	private final ShareTokenService tokenService;
 	private final SharedSearchService sharedSearchService;
+	private final AppSettingsService appSettingsService;
 
 	public ShareController(
 			GalleryService galleryService,
@@ -84,13 +92,15 @@ public class ShareController {
 			ImageRepository imageRepository,
 			ImageStorageService storageService,
 			ShareTokenService tokenService,
-			SharedSearchService sharedSearchService) {
+			SharedSearchService sharedSearchService,
+			AppSettingsService appSettingsService) {
 		this.galleryService = galleryService;
 		this.directoryRepository = directoryRepository;
 		this.imageRepository = imageRepository;
 		this.storageService = storageService;
 		this.tokenService = tokenService;
 		this.sharedSearchService = sharedSearchService;
+		this.appSettingsService = appSettingsService;
 	}
 
 	/**
@@ -120,8 +130,8 @@ public class ShareController {
 	@GetMapping("/api/images/{imageId}/share-token")
 	public ShareLinkResponse imageShareToken(Authentication authentication, @PathVariable Long imageId) {
 		Image image = galleryService.requireImage(imageId);
-		if (image.getMediaType() == org.myphotodiary.cms.gallery.MediaType.VIDEO) {
-			throw new IllegalArgumentException("Sharing a video link is not supported yet");
+		if (image.getMediaType() == org.myphotodiary.cms.gallery.MediaType.VIDEO && !appSettingsService.isVideoSharingAllowed()) {
+			throw new IllegalArgumentException("Sharing videos is turned off (Admin > Configure)");
 		}
 		return new ShareLinkResponse(tokenService.issueToken(ShareScope.IMAGE, image.getId()));
 	}
@@ -155,6 +165,16 @@ public class ShareController {
 		return ResponseEntity.ok().contentType(contentType).header("Cache-Control", "private, max-age=3600").body(new InputStreamResource(stream));
 	}
 
+	/** A shared video, streamed with Range support - only while video sharing is allowed (see class doc). */
+	@GetMapping("/api/public/images/{imageId}/stream")
+	public ResponseEntity<ResourceRegion> publicStream(@PathVariable Long imageId, @RequestParam String token, @RequestHeader HttpHeaders headers) {
+		Image image = requireAccessibleImage(imageId, token);
+		if (image.getMediaType() != org.myphotodiary.cms.gallery.MediaType.VIDEO) {
+			throw new IllegalArgumentException("Not a video: " + imageId);
+		}
+		return VideoRangeResponses.serve(storageService.resolveOriginal(image.getDirectory().getPath(), image.getName()), headers);
+	}
+
 	@GetMapping("/api/public/sequences/{directoryId}")
 	public PublicSequenceResponse publicSequence(@PathVariable Long directoryId, @RequestParam String token) {
 		ShareTokenClaims claims = tokenService.validateToken(token);
@@ -162,8 +182,9 @@ public class ShareController {
 			throw new InvalidShareTokenException("Share token does not match the requested sequence");
 		}
 		Directory directory = directoryRepository.findById(directoryId).orElseThrow(() -> new DirectoryNotFoundException(directoryId));
+		boolean videos = appSettingsService.isVideoSharingAllowed();
 		List<PublicImageResponse> images = imageRepository.findByDirectory_IdOrderByNameAsc(directoryId).stream()
-				.filter(img -> img.getMediaType() != org.myphotodiary.cms.gallery.MediaType.VIDEO) // see class javadoc - video out of scope for this first pass
+				.filter(img -> videos || img.getMediaType() != org.myphotodiary.cms.gallery.MediaType.VIDEO) // see class javadoc
 				.map(img -> PublicImageResponse.from(img, token))
 				.toList();
 		return new PublicSequenceResponse(directory.getId(), directory.getDescription(), images);
@@ -191,8 +212,8 @@ public class ShareController {
 		if (!allowed) {
 			throw new InvalidShareTokenException("Share token does not grant access to this image");
 		}
-		if (image.getMediaType() == org.myphotodiary.cms.gallery.MediaType.VIDEO) {
-			throw new InvalidShareTokenException("Video sharing is not supported yet");
+		if (image.getMediaType() == org.myphotodiary.cms.gallery.MediaType.VIDEO && !appSettingsService.isVideoSharingAllowed()) {
+			throw new InvalidShareTokenException("Video sharing is turned off");
 		}
 		return image;
 	}

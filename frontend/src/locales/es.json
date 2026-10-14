@@ -52,7 +52,9 @@
     "invalidSequenceName": "Un nombre de secuencia es un nombre simple: sin «/» ni «\\», y no puede empezar por un punto.",
     "sequenceName": "Nombre",
     "sequenceDate": "Fecha (MM/AAAA)",
-    "invalidSequenceDate": "Fecha no válida: formato esperado MM/AAAA, p. ej. 08/2026."
+    "invalidSequenceDate": "Fecha no válida: formato esperado MM/AAAA, p. ej. 08/2026.",
+    "mergeConfirm": "La secuencia «{{path}}» ya existe (fotos: {{targetCount}}). ¿Fusionar esta secuencia con ella (fotos a mover: {{sourceCount}})? Esta secuencia se eliminará después; una foto cuyo nombre de archivo ya se usa allí recibe un sufijo (-2).",
+    "mergeGroupWarning": "Las fotos movidas pertenecerán a su grupo «{{targetGroup}}» en lugar de «{{sourceGroup}}»."
   },
   "geolocation": {
     "loadError": "No se pudo cargar el mapa. Comprueba tu conexión e inténtalo de nuevo.",
@@ -172,7 +174,8 @@
     "maxVideoSizeMb": "Tamaño máximo de vídeo (MB)",
     "appVersion": "myPhotoDiary versión {{version}}",
     "targetUploadSeconds": "Tiempo medio de subida objetivo por foto (segundos)",
-    "maxShareSize": "Número máximo de fotos en un resultado de búsqueda compartido"
+    "maxShareSize": "Número máximo de fotos en un resultado de búsqueda compartido",
+    "allowVideoSharing": "Permitir compartir vídeos por enlace (se transmiten desde este servidor a cualquiera que tenga el enlace)"
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "nueva/ruta/de/carpeta",

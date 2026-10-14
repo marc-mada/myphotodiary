@@ -17,6 +17,7 @@
 package org.myphotodiary.cms.gallery;
 
 import java.io.UncheckedIOException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
@@ -35,6 +36,24 @@ public class GalleryApiExceptionHandler {
 	@ExceptionHandler({ DirectoryAlreadyExistsException.class, ImageAlreadyExistsException.class, AttributeAlreadyExistsException.class })
 	public ResponseEntity<?> conflict(RuntimeException ex) {
 		return problem(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	/**
+	 * 409 with what the merge would do (10/10/2026), so the client can ask
+	 * the user to confirm before retrying with `merge: true`. `code` tells
+	 * it apart from a plain "already exists" conflict.
+	 */
+	@ExceptionHandler(SequenceMergeRequiredException.class)
+	public ResponseEntity<?> mergeRequired(SequenceMergeRequiredException ex) {
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("error", ex.getMessage());
+		body.put("code", "SEQUENCE_EXISTS");
+		body.put("targetPath", ex.getTargetPath());
+		body.put("sourceImageCount", ex.getSourceImageCount());
+		body.put("targetImageCount", ex.getTargetImageCount());
+		body.put("sourceGroup", ex.getSourceGroup());
+		body.put("targetGroup", ex.getTargetGroup());
+		return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
 	}
 
 	@ExceptionHandler({ IllegalArgumentException.class, IllegalStateException.class })

@@ -199,6 +199,9 @@ erDiagram
     app_settings {
         bigint id PK "always 1, single-row table"
         bigint max_video_size_bytes "admin-editable, default 20MB (V11, was 500MB in V10)"
+        int target_upload_seconds "V13, default 10"
+        int max_share_size "V14, default 50"
+        boolean allow_video_sharing "V15, default false"
     }
 ```
 
@@ -218,6 +221,9 @@ erDiagram
 | V10 | `app_settings` (single-row) | Video upload size cap, app-wide not per-user |
 | V11 | (data-only) lowers the V10 default from 500MB to 20MB | — |
 | V12 | `image.latitude/longitude` | Sequence geolocation picker's per-image pins + average-based initialization |
+| V13 | `app_settings.target_upload_seconds` | Adaptive photo shrinking before upload |
+| V14 | `shared_search`, `shared_search_image`, `app_settings.max_share_size` | Shared search results (frozen list, 30 days) |
+| V15 | `app_settings.allow_video_sharing` | Video sharing links, off by default |
 
 Every migration after V2/V3 deliberately adds only the column(s) the
 screen actually being built needs at that moment — a running principle
@@ -372,7 +378,7 @@ means "any authenticated role."
 | DELETE | `/api/users/{userName}` | ADMIN | Delete user |
 | GET/POST/DELETE | `/api/users/{userName}/roles[/{groupName}]` | ADMIN | Role assignments |
 | GET/PATCH | `/api/users/{userName}/settings` | ADMIN | Admin edits *another* user's settings |
-| GET | `/api/app-settings` | any | Read app-wide settings (max video size) |
+| GET | `/api/app-settings` | any | Read app-wide settings (max video size, upload target, max share size, video sharing allowed) |
 | GET | `/api/version` | Authenticated | Version of the backend jar actually running (Spring Boot build-info), shown in Admin → Configure |
 <!-- app-settings now also carries targetUploadSeconds (V13) - drives frontend/src/upload/adaptiveShrink.js -->
 | PATCH | `/api/app-settings` | ADMIN | Update app-wide settings |
@@ -381,7 +387,7 @@ means "any authenticated role."
 | GET | `/api/directories/by-path` | any | Resolve a filesystem path to its DB row |
 | GET | `/api/directories/{id}` | any | Get one directory |
 | PATCH | `/api/directories/{id}` | RBAC `EDIT_SEQUENCE` | Update comment/geolocation/attributes |
-| POST | `/api/directories/{id}/rename` | RBAC `EDIT_SEQUENCE` | Move files + cascade path change to descendants |
+| POST | `/api/directories/{id}/rename` | RBAC `EDIT_SEQUENCE` | Move files + cascade path change to descendants; target already a sequence → 409 `SEQUENCE_EXISTS` (counts, groups), or merge into it with `merge: true` (`EDIT_SEQUENCE` on both) |
 | GET | `/api/directories/{directoryId}/images` | any | List images in a directory |
 | POST | `/api/directories/{directoryId}/images` | RBAC `CREATE_SEQUENCE`/`EDIT_SEQUENCE` | Fixed-directory upload (vestigial — see §10) |
 | GET | `/api/images/search` | any | Paginated attribute+rating+date-range+free-text search |
@@ -407,7 +413,8 @@ means "any authenticated role."
 | GET | `/api/directories/{directoryId}/share-token` | any | Issue a 30-day, SEQUENCE-scoped external share token |
 | GET | `/api/public/images/{imageId}` | **public** | One shared image's metadata, validated by its own signed token, not Spring Security |
 | GET | `/api/public/images/{imageId}/thumbnail` / `/web` | **public** | Shared image bytes, same token validation |
-| GET | `/api/public/sequences/{directoryId}` | **public** | A shared sequence's images (video excluded), same token validation |
+| GET | `/api/public/images/{imageId}/stream` | **public** | A shared video, Range-request streaming (same code as `/api/videos/{id}/stream`), share-token validated - only while `allow_video_sharing` is on |
+| GET | `/api/public/sequences/{directoryId}` | **public** | A shared sequence's images (videos only while `allow_video_sharing` is on, with a `streamUrl`), same token validation |
 | GET | `/share/image/{imageId}` / `/share/sequence/{directoryId}` | **public** | Crawler-facing HTML with real per-share `og:image` tags (`ShareLinkPreviewController`, 25/09/2026) — not `/api/*`, this is the exact public share URL itself, only ever reached by a known link-preview bot (the web server's User-Agent-conditioned routing, real visitors keep hitting the static SPA) |
 | GET | `/api/admin/backups` | ADMIN | DB snapshot list + image-tree backup status (§10) |
 | POST | `/api/admin/backups/db` | ADMIN | Trigger a DB backup now |
@@ -627,6 +634,14 @@ plain white-surface form styling instead.
 - Slideshow, full-screen, cross-fade transitions, next-image preloading,
   keyboard shortcuts (arrows, space, escape).
 - Sequence rename (moves files, cascades path changes to descendants).
+  Renaming/moving onto an existing sequence merges into it once the user
+  confirms (`DirectoryIndexerService.mergeInto`): picture rows keep their
+  ids (comments, ratings, tags, shared searches survive), files and their
+  `.thumbnails`/`.webimg` copies move, a clashing file name gets a `-2`
+  suffix, other files and sub-sequences follow (refused if a sub-sequence
+  name exists on both sides), comments are concatenated, tags combined,
+  target group/location/date kept; the source row and emptied folder are
+  removed.
 - Sequence geolocation via an interactive Leaflet/OpenStreetMap picker
   (draggable marker, no API key required) - shows a read-only dot for every
   image in the sequence that carries EXIF GPS (`image.latitude/longitude`,

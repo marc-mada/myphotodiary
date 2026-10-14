@@ -52,7 +52,9 @@
     "invalidSequenceName": "Ein Sequenzname ist ein einzelner Name: ohne „/“ oder „\\“, und er darf nicht mit einem Punkt beginnen.",
     "sequenceName": "Name",
     "sequenceDate": "Datum (MM/JJJJ)",
-    "invalidSequenceDate": "Ungültiges Datum: erwartet MM/JJJJ, z. B. 08/2026."
+    "invalidSequenceDate": "Ungültiges Datum: erwartet MM/JJJJ, z. B. 08/2026.",
+    "mergeConfirm": "Die Sequenz „{{path}}“ existiert bereits (Fotos: {{targetCount}}). Diese Sequenz damit zusammenführen (zu verschiebende Fotos: {{sourceCount}})? Diese Sequenz wird danach entfernt; ein Foto, dessen Dateiname dort schon vergeben ist, erhält ein Suffix (-2).",
+    "mergeGroupWarning": "Die verschobenen Fotos gehören dann zu deren Gruppe „{{targetGroup}}“ statt „{{sourceGroup}}“."
   },
   "geolocation": {
     "loadError": "Die Karte konnte nicht geladen werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
@@ -172,7 +174,8 @@
     "maxVideoSizeMb": "Maximale Videogröße (MB)",
     "appVersion": "myPhotoDiary Version {{version}}",
     "targetUploadSeconds": "Angestrebte durchschnittliche Upload-Zeit pro Foto (Sekunden)",
-    "maxShareSize": "Maximale Anzahl Fotos in einem geteilten Suchergebnis"
+    "maxShareSize": "Maximale Anzahl Fotos in einem geteilten Suchergebnis",
+    "allowVideoSharing": "Teilen von Videos per Link erlauben (von diesem Server an jeden mit dem Link gestreamt)"
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "neuer/verzeichnis/pfad",

@@ -68,6 +68,11 @@ const POSTIT_GAP_PX = 12;
 // button). A shared/public item has no originalUrl, so it keeps webUrl.
 function MediaLayer({ item, onReady, ImageComponent, progressive, hd = false }) {
 	if (item.mediaType === 'VIDEO') {
+		// A shared video (share-link viewer, 14/10/2026) already carries its
+		// public stream URL; a signed-in one asks for a stream token first.
+		if (item.streamUrl) {
+			return <video src={item.streamUrl} controls className="visible-image" onLoadedMetadata={onReady} />;
+		}
 		return <AuthVideo imageId={item.id} className="visible-image" onLoadedMetadata={onReady} />;
 	}
 	const src = hd && item.originalUrl ? item.originalUrl : item.webUrl;
@@ -312,6 +317,9 @@ export function ImageViewer({
 	onDelete,
 	onGoToDirectory,
 	onCopyImageLink,
+	// Video sharing allowed app-wide (14/10/2026, Admin > Configure): only
+	// then is the picture-link button shown on a video.
+	videoSharingAllowed = false,
 	onCopySequenceLink,
 	// Search screen (04/10/2026): the first share icon shares the whole
 	// search result there, not a sequence - only its tooltip differs.
@@ -578,9 +586,11 @@ export function ImageViewer({
 						<div className="controls-button" onClick={onCopySequenceLink} title={copySequenceLinkTitle ?? t('imageViewer.copySequenceLink')}>
 							<SequenceLinkIcon />
 						</div>
-						<div className="controls-button" onClick={onCopyImageLink} title={t('imageViewer.copyImageLink')}>
-							<ImageLinkIcon />
-						</div>
+						{(image?.mediaType !== 'VIDEO' || videoSharingAllowed) && (
+							<div className="controls-button" onClick={onCopyImageLink} title={t('imageViewer.copyImageLink')}>
+								<ImageLinkIcon />
+							</div>
+						)}
 						{showCommentButton && (
 							<div className="controls-button" onClick={() => setPostItRevealKey((k) => k + 1)} title={t('imageViewer.showComment')}>
 								<CommentIcon />

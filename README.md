@@ -76,6 +76,26 @@ see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Release Notes
 
+### 2.11.0 — 2026-10-14
+
+Upgrade note: if you re-indexed sequences containing videos with an
+earlier version (Admin → Index management, Batch Publish), check that
+their videos are still there — restore any missing ones from a backup.
+
+- Desktop: renaming a sequence (or moving it to another date) onto an
+  existing sequence now offers to merge the two, after confirmation.
+  Pictures keep their comments, ratings and tags; a clashing file name
+  gets a `-2` suffix.
+- Video sharing links, if an Admin allows them (Admin → Configure, off by
+  default): a video gets a link like a picture, appears in shared
+  sequences and search results, and plays for visitors without an
+  account. Turning the setting off stops existing video links.
+- **Fix**: re-indexing a sequence (Admin → Index management, Batch
+  Publish) deleted the videos it contained, files included. Fixed; videos
+  lost this way can only be recovered from a backup.
+- **Fix** (desktop): "Go to this sequence in Gallery" from Search now also
+  scrolls the filmstrip to the picture, instead of leaving it at the top.
+
 ### 2.10.4 — 2026-10-10
 
 - Mobile: on a zoomed picture, swiping left or right moves it; once it

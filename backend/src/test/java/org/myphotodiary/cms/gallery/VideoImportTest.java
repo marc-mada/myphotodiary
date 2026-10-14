@@ -70,6 +70,8 @@ class VideoImportTest {
 	@Autowired
 	private ImportService importService;
 	@Autowired
+	private DirectoryIndexerService indexerService;
+	@Autowired
 	private ImageRepository imageRepository;
 	@Autowired
 	private UserService userService;
@@ -111,6 +113,25 @@ class VideoImportTest {
 		// image, not merely a non-empty one.
 		assertThat(javax.imageio.ImageIO.read(thumbnail.toFile())).isNotNull();
 		assertThat(imageRepository.findById(result.image().id())).isPresent();
+	}
+
+	/**
+	 * Real data-loss bug found 14/10/2026: re-indexing a sequence only lists
+	 * picture files, so an uploaded video looked like a file that had
+	 * disappeared - its row was deleted, and so was the video file itself.
+	 */
+	@Test
+	void reindexingASequence_keepsItsVideos_rowAndFile() throws IOException {
+		ImportResponse video = importService.importImage(auth, h264Mp4File("keep-me.mp4"), false, false, null, "reindex-videos", null);
+		Path folder = storageRoot.resolve("reindex-videos");
+		java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(40, 30, java.awt.image.BufferedImage.TYPE_INT_RGB);
+		javax.imageio.ImageIO.write(img, "jpg", folder.resolve("photo.jpg").toFile());
+
+		indexerService.indexDirectory("reindex-videos", null);
+
+		assertThat(Files.exists(folder.resolve("keep-me.mp4"))).isTrue();
+		assertThat(imageRepository.findById(video.image().id())).isPresent();
+		assertThat(Files.exists(folder.resolve(".thumbnails").resolve("keep-me.mp4.jpg"))).isTrue();
 	}
 
 	@Test

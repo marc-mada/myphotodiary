@@ -382,7 +382,12 @@ export function MobileImageViewer({
 		>
 			<div ref={layerRef} className="mobile-zoom-layer">
 				{image.mediaType === 'VIDEO' ? (
-					<AuthVideo imageId={image.id} className="mobile-visible-image" />
+					image.streamUrl ? (
+						// Shared video (share link, 14/10/2026): public stream URL.
+						<video src={image.streamUrl} controls className="mobile-visible-image" />
+					) : (
+						<AuthVideo imageId={image.id} className="mobile-visible-image" />
+					)
 				) : progressive ? (
 					<ProgressiveImage src={image.webUrl} thumbnailSrc={image.thumbnailUrl} alt={image.name} className="mobile-visible-image" />
 				) : (

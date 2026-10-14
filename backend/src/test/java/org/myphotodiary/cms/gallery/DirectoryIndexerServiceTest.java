@@ -350,8 +350,99 @@ class DirectoryIndexerServiceTest {
 		Files.createDirectories(storageRoot.resolve(base).resolve("b"));
 		DirectoryResponse dirA = indexerService.indexDirectory(base + "/a", null);
 
+		// Since 10/10/2026 a taken name is a merge to confirm, not a plain refusal.
 		assertThatThrownBy(() -> indexerService.renameDirectory(auth, dirA.id(), new RenameDirectoryRequest("b")))
-				.isInstanceOf(IllegalStateException.class);
+				.isInstanceOf(SequenceMergeRequiredException.class);
+		assertThat(Files.exists(storageRoot.resolve(base).resolve("a").resolve("photo.jpg"))).isTrue();
+	}
+
+	@Test
+	void renameDirectory_toAnExistingSequence_mergesOnlyOnceConfirmed() throws IOException {
+		String base = "2026/08/merge-" + Long.toString(System.nanoTime(), 36);
+		Path dirA = storageRoot.resolve(base).resolve("a");
+		Path dirB = storageRoot.resolve(base).resolve("b");
+		Files.createDirectories(dirA.resolve("sub-a"));
+		Files.createDirectories(dirB);
+		writeFile(dirA, "only-a.jpg");
+		writeFile(dirA, "same.jpg");
+		writeFile(dirA.resolve("sub-a"), "deep.jpg");
+		Files.writeString(dirA.resolve("notes.txt"), "not a picture");
+		writeFile(dirB, "same.jpg");
+		writeFile(dirB, "only-b.jpg");
+		DirectoryResponse a = indexerService.indexDirectory(base + "/a", null);
+		DirectoryResponse b = indexerService.indexDirectory(base + "/b", null);
+		indexerService.indexDirectory(base + "/a/sub-a", null);
+		indexerService.updateDirectoryDetail(auth, a.id(), new UpdateDirectoryDetailRequest("Comment A", 43.5, 7.0, null, List.of("merge-tag-a-" + base.hashCode())));
+		indexerService.updateDirectoryDetail(auth, b.id(), new UpdateDirectoryDetailRequest("Comment B", null, null, null, List.of("merge-tag-b-" + base.hashCode())));
+		Image movedSame = imageRepository.findByDirectory_IdOrderByNameAsc(a.id()).stream().filter(i -> i.getName().equals("same.jpg")).findFirst().orElseThrow();
+		movedSame.setDescription("from A");
+		Long movedSameId = movedSame.getId();
+
+		// Not confirmed: refused with what the merge would do, nothing moves.
+		assertThatThrownBy(() -> indexerService.renameDirectory(auth, a.id(), new RenameDirectoryRequest("b")))
+				.isInstanceOfSatisfying(SequenceMergeRequiredException.class, ex -> {
+					assertThat(ex.getTargetPath()).isEqualTo(base + "/b");
+					assertThat(ex.getSourceImageCount()).isEqualTo(2);
+					assertThat(ex.getTargetImageCount()).isEqualTo(2);
+				});
+		assertThat(Files.exists(dirA.resolve("same.jpg"))).isTrue();
+
+		DirectoryResponse merged = indexerService.renameDirectory(auth, a.id(), new RenameDirectoryRequest("b", null, null, true));
+
+		assertThat(merged.id()).isEqualTo(b.id());
+		assertThat(imageRepository.findByDirectory_IdOrderByNameAsc(b.id())).extracting(Image::getName)
+				.containsExactly("only-a.jpg", "only-b.jpg", "same-2.jpg", "same.jpg");
+		Image renamed = imageRepository.findById(movedSameId).orElseThrow(); // same row, comment kept
+		assertThat(renamed.getName()).isEqualTo("same-2.jpg");
+		assertThat(renamed.getDescription()).isEqualTo("from A");
+		for (String name : List.of("only-a.jpg", "same-2.jpg", "same.jpg", "only-b.jpg")) {
+			assertThat(Files.exists(dirB.resolve(name))).as(name).isTrue();
+			assertThat(Files.exists(dirB.resolve(".thumbnails").resolve(name))).as("thumbnail " + name).isTrue();
+		}
+		assertThat(Files.exists(dirB.resolve("notes.txt"))).isTrue();
+		assertThat(Files.exists(dirB.resolve("sub-a").resolve("deep.jpg"))).isTrue();
+		assertThat(directoryRepository.findByPath(base + "/b/sub-a")).isPresent();
+		assertThat(directoryRepository.findByPath(base + "/a")).isEmpty();
+		assertThat(directoryRepository.findByPath(base + "/a/sub-a")).isEmpty();
+		assertThat(Files.exists(dirA)).isFalse();
+
+		Directory target = directoryRepository.findById(b.id()).orElseThrow();
+		assertThat(target.getDescription()).isEqualTo("Comment B\n\nComment A");
+		assertThat(target.getAttributes()).extracting(Attribute::getName)
+				.contains("merge-tag-a-" + base.hashCode(), "merge-tag-b-" + base.hashCode());
+		assertThat(target.getLatitude()).isEqualTo(43.5); // target had none
+	}
+
+	@Test
+	void renameDirectory_merge_refusedWhenBothHaveASubSequenceOfTheSameName_andNothingMoves() throws IOException {
+		String base = "2026/08/merge-clash-" + Long.toString(System.nanoTime(), 36);
+		Files.createDirectories(storageRoot.resolve(base + "/a/sub"));
+		Files.createDirectories(storageRoot.resolve(base + "/b/sub"));
+		writeFile(storageRoot.resolve(base + "/a"), "p.jpg");
+		writeFile(storageRoot.resolve(base + "/b"), "q.jpg");
+		DirectoryResponse a = indexerService.indexDirectory(base + "/a", null);
+		indexerService.indexDirectory(base + "/b", null);
+
+		assertThatThrownBy(() -> indexerService.renameDirectory(auth, a.id(), new RenameDirectoryRequest("b", null, null, true)))
+				.isInstanceOf(IllegalArgumentException.class);
+		assertThat(Files.exists(storageRoot.resolve(base + "/a/p.jpg"))).isTrue();
+		assertThat(directoryRepository.findByPath(base + "/a")).isPresent();
+	}
+
+	@Test
+	void renameDirectory_mergeIntoAFolderNeverIndexed_indexesItFirst() throws IOException {
+		String base = "2026/08/merge-disk-" + Long.toString(System.nanoTime(), 36);
+		Files.createDirectories(storageRoot.resolve(base + "/a"));
+		Files.createDirectories(storageRoot.resolve(base + "/b"));
+		writeFile(storageRoot.resolve(base + "/a"), "p.jpg");
+		writeFile(storageRoot.resolve(base + "/b"), "dropped-on-disk.jpg");
+		DirectoryResponse a = indexerService.indexDirectory(base + "/a", null);
+
+		DirectoryResponse merged = indexerService.renameDirectory(auth, a.id(), new RenameDirectoryRequest("b", null, null, true));
+
+		assertThat(merged.path()).isEqualTo(base + "/b");
+		assertThat(imageRepository.findByDirectory_IdOrderByNameAsc(merged.id())).extracting(Image::getName)
+				.containsExactly("dropped-on-disk.jpg", "p.jpg");
 	}
 
 	@Test
@@ -431,7 +522,7 @@ class DirectoryIndexerServiceTest {
 		assertThatThrownBy(() -> indexerService.renameDirectory(auth, seq.id(), new RenameDirectoryRequest(name, 1975, 13))).isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> indexerService.renameDirectory(auth, seq.id(), new RenameDirectoryRequest(name, 999, 3))).isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> indexerService.renameDirectory(auth, seq.id(), new RenameDirectoryRequest(name, null, 3))).isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> indexerService.renameDirectory(auth, seq.id(), new RenameDirectoryRequest(name, 1976, 4))).isInstanceOf(IllegalStateException.class);
+		assertThatThrownBy(() -> indexerService.renameDirectory(auth, seq.id(), new RenameDirectoryRequest(name, 1976, 4))).isInstanceOf(SequenceMergeRequiredException.class);
 
 		// A sub-sequence (year/month/name/sub) has no date of its own to change.
 		Files.createDirectories(storageRoot.resolve(path + "/sub"));

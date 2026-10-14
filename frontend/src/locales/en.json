@@ -52,7 +52,9 @@
     "invalidSequenceName": "A sequence name is a single name: no \"/\" or \"\\\", and it can't start with a dot.",
     "sequenceName": "Name",
     "sequenceDate": "Date (MM/YYYY)",
-    "invalidSequenceDate": "Invalid date: expected MM/YYYY, e.g. 08/2026."
+    "invalidSequenceDate": "Invalid date: expected MM/YYYY, e.g. 08/2026.",
+    "mergeConfirm": "A sequence \"{{path}}\" already exists (pictures: {{targetCount}}). Merge this sequence into it (pictures to move: {{sourceCount}})? This sequence will then be removed; a picture whose file name is already used there gets a suffix (-2).",
+    "mergeGroupWarning": "The moved pictures will belong to its group \"{{targetGroup}}\" instead of \"{{sourceGroup}}\"."
   },
   "geolocation": {
     "loadError": "Could not load the map. Check your connection and try again.",
@@ -172,7 +174,8 @@
     "maxVideoSizeMb": "Maximum video size (MB)",
     "appVersion": "myPhotoDiary version {{version}}",
     "targetUploadSeconds": "Target average upload time per photo (seconds)",
-    "maxShareSize": "Maximum pictures in a shared search result"
+    "maxShareSize": "Maximum pictures in a shared search result",
+    "allowVideoSharing": "Allow sharing videos by link (streamed from this server to anyone who has the link)"
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "new/directory/path",

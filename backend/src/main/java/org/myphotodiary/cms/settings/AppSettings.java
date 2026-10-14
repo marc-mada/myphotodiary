@@ -49,6 +49,10 @@ public class AppSettings {
 	@Column(name = "max_share_size", nullable = false)
 	private int maxShareSize;
 
+	/** V15 - whether share links may include videos (14/10/2026), see ShareController. */
+	@Column(name = "allow_video_sharing", nullable = false)
+	private boolean allowVideoSharing;
+
 	protected AppSettings() {
 		// JPA
 	}
@@ -79,5 +83,13 @@ public class AppSettings {
 
 	public void setMaxShareSize(int maxShareSize) {
 		this.maxShareSize = maxShareSize;
+	}
+
+	public boolean isAllowVideoSharing() {
+		return allowVideoSharing;
+	}
+
+	public void setAllowVideoSharing(boolean allowVideoSharing) {
+		this.allowVideoSharing = allowVideoSharing;
 	}
 }
