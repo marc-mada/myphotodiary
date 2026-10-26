@@ -45,7 +45,10 @@ public record ImageResponse(
 		// null together always (ExifGpsReader.Coordinates is all-or-nothing),
 		// never one without the other.
 		Double latitude,
-		Double longitude) {
+		Double longitude,
+		// The picture's sequence path ("" for the root, 19/10/2026) - shown
+		// and pre-filled by the Rename / Move form (ImageEditForm).
+		String directoryPath) {
 
 	public static ImageResponse from(Image image) {
 		String base = "/api/images/" + image.getId();
@@ -78,6 +81,7 @@ public record ImageResponse(
 				// search results) put it there.
 				image.getDirectory().getId(),
 				image.getLatitude(),
-				image.getLongitude());
+				image.getLongitude(),
+				image.getDirectory().getPath());
 	}
 }

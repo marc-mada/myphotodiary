@@ -18,6 +18,10 @@ package org.myphotodiary.cms.gallery.dto;
 import java.time.LocalDate;
 import java.util.List;
 
-/** The search criteria to share the result of - same fields as GET /api/images/search. */
-public record SearchShareRequest(List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate, String text) {
+/** The search criteria to share the result of - same fields as GET /api/images/search ({@code mediaType}: "IMAGE"/"VIDEO"/null, 15/10/2026). */
+public record SearchShareRequest(List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate, String text, String mediaType) {
+
+	public SearchShareRequest(List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate, String text) {
+		this(attributeNames, minRating, fromDate, toDate, text, null);
+	}
 }

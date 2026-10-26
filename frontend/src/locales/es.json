@@ -34,6 +34,7 @@
     "publishPictures": "Publicar fotos",
     "sequenceGeolocation": "Geolocalización de la secuencia",
     "noImagesYet": "Todavía no hay fotos - suelta algunas aquí abajo para empezar.",
+    "imageUnavailable": "No se encontró el archivo de esta foto en el servidor. Reindexar la secuencia (Administración → Gestión de la indexación) la quita de la lista.",
     "deleteImageConfirm": "¿Eliminar esta foto? Esta acción no se puede deshacer.",
     "linkCopied": "¡Enlace copiado!"
   },
@@ -69,6 +70,21 @@
     "downloading": "Descargando…",
     "tags": "Etiquetas (seleccionar una etiqueta también selecciona las suyas superiores)",
     "newTagPlaceholder": "nombre de la nueva etiqueta"
+  },
+  "imageMove": {
+    "open": "Renombrar / Mover…",
+    "title": "Renombrar / Mover",
+    "name": "Nombre",
+    "sequence": "Secuencia:",
+    "change": "Cambiar…",
+    "closeTree": "Cerrar el árbol",
+    "inheritedWarning": "El comentario y las etiquetas que esta foto recibe de su secuencia actual pasarán a ser los de la nueva secuencia. Su propio comentario, su valoración y sus etiquetas se conservan.",
+    "invalidName": "Un nombre no puede estar vacío, contener / o \\, ni empezar por un punto.",
+    "nameTaken": "Ya existe un archivo llamado {{name}} en ese lugar.",
+    "targetMissing": "Esta secuencia ya no existe.",
+    "save": "Renombrar / Mover",
+    "saving": "Moviendo…",
+    "cancel": "Cancelar"
   },
   "imageViewer": {
     "delete": "Eliminar",
@@ -114,7 +130,11 @@
     "downloadFailed_other": "{{count}} fotos no se pudieron descargar.",
     "copySearchLink": "Copiar un enlace para compartir este resultado de búsqueda",
     "shareTruncated_one": "Enlace copiado: solo se comparte la primera de las {{total}} fotos encontradas (máximo permitido).",
-    "shareTruncated_other": "Enlace copiado: solo se comparten las primeras {{count}} de las {{total}} fotos encontradas (máximo permitido)."
+    "shareTruncated_other": "Enlace copiado: solo se comparten las primeras {{count}} de las {{total}} fotos encontradas (máximo permitido).",
+    "mediaType": "Tipo",
+    "mediaTypeAll": "Todos",
+    "mediaTypeImage": "Fotos",
+    "mediaTypeVideo": "Vídeos"
   },
   "upload": {
     "sortAndCreateSequence": "Clasificar por fecha y crear una nueva secuencia",
@@ -175,7 +195,9 @@
     "appVersion": "myPhotoDiary versión {{version}}",
     "targetUploadSeconds": "Tiempo medio de subida objetivo por foto (segundos)",
     "maxShareSize": "Número máximo de fotos en un resultado de búsqueda compartido",
-    "allowVideoSharing": "Permitir compartir vídeos por enlace (se transmiten desde este servidor a cualquiera que tenga el enlace)"
+    "allowVideoSharing": "Permitir compartir vídeos por enlace (se transmiten desde este servidor a cualquiera que tenga el enlace)",
+    "presentation": "Presentación (escritorio)",
+    "onlineCapture": "Captura en línea (móvil: Fotografiar y Grabar en el menú)"
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "nueva/ruta/de/carpeta",
@@ -266,11 +288,33 @@
     "picturesSelected_one": "{{count}} foto seleccionada",
     "picturesSelected_other": "{{count}} fotos seleccionadas",
     "upload": "Enviar",
-    "shareSearchResult": "Compartir el resultado de búsqueda"
+    "shareSearchResult": "Compartir el resultado de búsqueda",
+    "sharedFilesTitle": "Publicar archivos compartidos",
+    "sharedFilesUnavailable": "Los archivos compartidos ya no están disponibles: vuelva a compartirlos.",
+    "sharedFilesHint": "Cada archivo va a año/mes/<nombre de secuencia abajo>",
+    "addToExistingSequence": "Añadir a una secuencia existente",
+    "sharedFilesExistingHint": "Todos los archivos van a la carpeta elegida abajo y conservan su propia fecha.",
+    "importTarget": "Destino: {{path}}",
+    "changeImportTarget": "Elegir otra carpeta",
+    "recentSequences": "Recientes",
+    "browseSequences": "Explorar",
+    "chooseThisFolder": "Elegir esta carpeta",
+    "noSubfolders": "Sin subcarpetas",
+    "someFilesFailed_one": "No se pudo publicar {{count}} archivo:",
+    "someFilesFailed_other": "No se pudieron publicar {{count}} archivos:"
   },
   "share": {
     "loading": "Cargando…",
     "invalidLink": "Este enlace no es válido o ha caducado.",
     "searchEmpty": "Las fotos de este resultado de búsqueda compartido ya no están disponibles."
+  },
+  "presentation": {
+    "dark": "Galería oscura",
+    "bright": "Galería clara",
+    "titanium": "Galería titanio",
+    "green-wilderness": "Galería naturaleza salvaje",
+    "old-rose": "Galería rosa antiguo",
+    "deep-blue": "Galería azul profundo",
+    "lagoon": "Galería laguna"
   }
 }

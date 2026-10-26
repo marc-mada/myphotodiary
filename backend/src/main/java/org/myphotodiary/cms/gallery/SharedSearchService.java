@@ -72,12 +72,13 @@ public class SharedSearchService {
 
 	@Transactional
 	public SearchShareResponse share(Authentication authentication, SearchShareRequest request) {
-		if (!GalleryService.hasSearchCriteria(request.attributeNames(), request.minRating(), request.fromDate(), request.toDate(), request.text())) {
+		MediaType mediaType = GalleryController.parseMediaType(request.mediaType());
+		if (!GalleryService.hasSearchCriteria(request.attributeNames(), request.minRating(), request.fromDate(), request.toDate(), request.text(), mediaType)) {
 			throw new IllegalArgumentException("A search result can only be shared once at least one search criterion is set");
 		}
 		boolean videoSharing = appSettingsService.isVideoSharingAllowed();
 		List<Long> shareable = galleryService
-				.searchMatches(authentication, request.attributeNames(), request.minRating(), request.fromDate(), request.toDate(), request.text())
+				.searchMatches(authentication, request.attributeNames(), request.minRating(), request.fromDate(), request.toDate(), request.text(), mediaType)
 				.stream()
 				.filter(img -> videoSharing || img.getMediaType() != MediaType.VIDEO)
 				.map(Image::getId)

@@ -224,6 +224,9 @@ erDiagram
 | V13 | `app_settings.target_upload_seconds` | Adaptive photo shrinking before upload |
 | V14 | `shared_search`, `shared_search_image`, `app_settings.max_share_size` | Shared search results (frozen list, 30 days) |
 | V15 | `app_settings.allow_video_sharing` | Video sharing links, off by default |
+| V16 | `merged_sequence`, `merged_sequence_image` | A merged-away sequence's own pictures, so its share links keep showing exactly those (`SequenceShareResolver`) |
+| V17 | `app_user.presentation` | Desktop presentation per user (`dark` default) |
+| V18 | `app_user.online_capture` | Mobile Camera/Film menu entries per user (off by default) |
 
 Every migration after V2/V3 deliberately adds only the column(s) the
 screen actually being built needs at that moment — a running principle
@@ -259,6 +262,8 @@ classDiagram
         double defaultLatitude
         double defaultLongitude
         int postItFadeDelay
+        String presentation
+        boolean onlineCapture
         getPrimaryRoleAssignment() Optional~RoleAssignment~
     }
     class Group {
@@ -390,7 +395,7 @@ means "any authenticated role."
 | POST | `/api/directories/{id}/rename` | RBAC `EDIT_SEQUENCE` | Move files + cascade path change to descendants; target already a sequence → 409 `SEQUENCE_EXISTS` (counts, groups), or merge into it with `merge: true` (`EDIT_SEQUENCE` on both) |
 | GET | `/api/directories/{directoryId}/images` | any | List images in a directory |
 | POST | `/api/directories/{directoryId}/images` | RBAC `CREATE_SEQUENCE`/`EDIT_SEQUENCE` | Fixed-directory upload (vestigial — see §10) |
-| GET | `/api/images/search` | any | Paginated attribute+rating+date-range+free-text search |
+| GET | `/api/images/search` | any | Paginated attribute+rating+date-range+free-text search; `mediaType=IMAGE\|VIDEO` (optional) ANDed like rating/dates, read from `image.media_type` |
 | PATCH | `/api/images/{imageId}` | RBAC `EDIT_IMAGE` | Edit description/rating/tags |
 | DELETE | `/api/images/{imageId}` | RBAC `DELETE_IMAGE` (ADMIN only — §7) | Delete an image |
 | GET | `/api/images/{imageId}/thumbnail` | any | 128px thumbnail bytes |
@@ -408,6 +413,7 @@ means "any authenticated role."
 | POST/PATCH/DELETE | `/api/attributes[/{id}]` | ADMIN | Tag CRUD, including reparenting |
 | GET | `/api/videos/{imageId}/token` | any | Issue a short-lived video streaming token |
 | GET | `/api/videos/{imageId}/stream` | **public** | Range-request video streaming, validated by its own signed token, not Spring Security |
+| POST | `/api/images/{imageId}/move` | RBAC `EDIT_IMAGE` (+ `EDIT_SEQUENCE` on the target when the sequence changes) | Rename and/or move one picture or video (`{newName, targetPath}`, either null to keep): files and `.thumbnails`/`.webimg` move, row keeps its id; same extension required; name taken in the target → 409, never suffixed; unindexed target folder is indexed first; files moved back if the DB update fails |
 | POST | `/api/images/{imageId}/rotate` | RBAC `EDIT_IMAGE` | Rotate original/web/thumbnail 90° × `quarterTurns` (optional, 1..3, default 1) right in place, one re-encode (rejects video) |
 | GET | `/api/images/{imageId}/share-token` | any | Issue a 30-day, IMAGE-scoped external share token |
 | GET | `/api/directories/{directoryId}/share-token` | any | Issue a 30-day, SEQUENCE-scoped external share token |
@@ -583,7 +589,7 @@ flowchart TD
     Admin --> Config["ConfigPanel"]
     Admin --> IndexMgmt["IndexManagementPanel"]
     Admin --> Tags["AttributeAdmin"]
-    Mobile --> MobileScreens["Home / Search / Upload /<br/>Camera / Nav / Edit pages"]
+    Mobile --> MobileScreens["Home / Search / Upload /<br/>Camera / Nav / Edit pages /<br/>Shared files (?shared=, share-target-sw.js)"]
 ```
 
 **Desktop-specific**: `DirectoryTree` (lazy filesystem-driven navigation),
@@ -615,6 +621,27 @@ The Admin screen is the one deliberate exception — its legacy dark-hive
 jQuery-UI theme was never treated as identity worth preserving, so it uses
 plain white-surface form styling instead.
 
+**Desktop presentations** (18/10/2026): every colour the desktop screens use
+comes from a `--mpd-*` CSS variable. `:root` holds the original look ("Dark
+Gallery", default - same computed colours as before, checked element by
+element on nine screens); `:root[data-presentation='bright'|'titanium'|
+'green-wilderness'|'old-rose'|'deep-blue'|'lagoon']` blocks redefine the
+variables. `presentation.js` sets the attribute on desktop only (never on mobile), from the user's
+`app_user.presentation` (V17, via `/api/me`, editable in User settings,
+validated by `UserSettingsUpdater.PRESENTATIONS`) and remembers the last
+one in `localStorage` for the sign-in screen. The filmstrip texture,
+post-it, stars and image editor keep their colours in every presentation.
+Desktop buttons and tabs get a convex gradient computed from
+`--mpd-button-bg`/`--mpd-tab-active-bg` with `color-mix()` (any
+presentation gets it for free; FilePond's own buttons are excluded).
+Images: `star.png` has a transparent background (was black), the
+empty-folder `default.png` map is drawn at ~20% opacity (was 75%), and
+`AppBanner` swaps in `photodiary-banner-short-dark-text.png` (dark
+lettering) on the light presentations (`LIGHT_PRESENTATIONS` in
+presentation.js).
+Adding a presentation = one CSS block + one id in
+`UserSettingsUpdater.PRESENTATIONS` and `presentation.js` + its label.
+
 ## 10. Feature list
 
 **Gallery & upload**
@@ -641,7 +668,21 @@ plain white-surface form styling instead.
   suffix, other files and sub-sequences follow (refused if a sub-sequence
   name exists on both sides), comments are concatenated, tags combined,
   target group/location/date kept; the source row and emptied folder are
-  removed.
+  removed. A `merged_sequence` row (V16) records the source id and its
+  picture ids, so share links made for the source keep showing only those
+  pictures (chained merges update its target).
+- Rename / Move one picture or video from its popup (desktop,
+  `DirectoryIndexerService.moveImage`): new file name (extension kept)
+  and/or another sequence picked in the tree. The row keeps its id
+  (comment, rating, tags, GPS, picture share links, shared searches
+  survive); a name already used in the target is refused (409); the
+  target's sequence date follows the usual "latest wins" rule; a
+  `merged_sequence` link no longer lists a picture moved out of its
+  sequence.
+- Indexing lists pictures **and** videos (`listMediaFileNames`): a video
+  dropped on disk gets a row if it passes `VideoFormatValidator` (skipped
+  and logged otherwise), an existing video row keeps its date, and tree
+  counts include videos.
 - Sequence geolocation via an interactive Leaflet/OpenStreetMap picker
   (draggable marker, no API key required) - shows a read-only dot for every
   image in the sequence that carries EXIF GPS (`image.latitude/longitude`,
@@ -786,6 +827,22 @@ for the full rationale)
   screen.
 - Reduced edit forms (description only), no slideshow/full-screen/delete.
 - Native camera capture entry point, PWA "Add to Home Screen" manifest.
+- Share to myPhotoDiary from another app (Android, installed app only -
+  see §12): `manifest.json`'s `share_target` POSTs the files to
+  `/share-receive`; `public/share-target-sw.js`, a service worker
+  registered on mobile only and doing nothing else, keeps them in
+  IndexedDB and opens `/?shared=<id>`; `MobileSharedFilesPage` (via
+  `sharedFiles.js`) publishes them with `MobileImportForm`
+  (`initialFiles`, automatic sorting forced: each file to its own
+  year/month, default group). The server never sees the share POST.
+  The share sheet only lists a really installed app (WebAPK), never a
+  home-screen shortcut: the manifest needs a 192px+ icon (Chrome's
+  minimum is 144px) - `legacy/mpd-192.png`/`mpd-512.png`, the banner's
+  book on the app's near-black, since the 128px `mpd.png` alone made the
+  app uninstallable (found 22/10/2026) - and a trusted HTTPS certificate.
+- Mobile upload batches (Publish/Camera/Film/shared files): a refused
+  file no longer stops the batch - the others are published, only the
+  refused ones stay selected with their reasons, a 403 stops at once.
 - Landscape: auto-fullscreen on the next tap (`useLandscapeFullscreen`,
   03/09/2026) — a browser only grants `requestFullscreen()` inside a real
   user gesture, never on an orientation-change event alone, so this arms
@@ -845,6 +902,19 @@ running dev instances, slice by slice.
 
 ## 12. Known limitations / not yet built
 
+- **Share to myPhotoDiary (21/10/2026)** — Web Share Target
+  (`manifest.json`'s `share_target`, POST `/share-receive`), received by
+  `public/share-target-sw.js`, a service worker registered on mobile only
+  that does nothing else (no caching): it keeps the files in IndexedDB and
+  opens `/?shared=<id>`; `MobileSharedFilesPage` publishes them through
+  the usual `/api/import` with `autoSort`, so each file goes to its own
+  year/month, default group. Limits: Android only, and only once the app
+  is installed (Chrome/Edge/Samsung Internet - no iOS/iPadOS support at
+  all, no Firefox); desktop not offered. If the worker isn't active (site
+  data cleared), the share POST reaches the web server and fails. WhatsApp
+  strips EXIF dates and GPS, so such photos are filed by their file-name
+  date or the file's date. A video is filed by the file's date (the date
+  recorded inside an MP4/MOV is not read), usually the day it was shared.
 - **Auth strategy resolved (18/09/2026)** — session-cookie login, backed
   by the embedded Tomcat's own `HttpSession` (§7). No longer an open
   decision/placeholder.

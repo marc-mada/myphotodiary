@@ -26,6 +26,10 @@ public record MeResponse(
 		double defaultLatitude,
 		double defaultLongitude,
 		int postItFadeDelay,
+		/** Desktop presentation id (18/10/2026). */
+		String presentation,
+		/** Mobile Camera/Film menu entries shown (26/10/2026). */
+		boolean onlineCapture,
 		// Added 28/08/2026 for the frontend's own Admin-tab access check
 		// (App.jsx) - reuses the exact same primary-role resolution
 		// UserResponse.from already uses, rather than a second, divergent
@@ -46,6 +50,8 @@ public record MeResponse(
 				user.getDefaultLatitude(),
 				user.getDefaultLongitude(),
 				user.getPostItFadeDelay(),
+				user.getPresentation(),
+				user.isOnlineCapture(),
 				primaryRole);
 	}
 }

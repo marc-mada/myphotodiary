@@ -18,5 +18,17 @@ package org.myphotodiary.cms.user.dto;
 
 /** Optional - present a value to change it. */
 public record UpdateMeRequest(
-		Integer maxQueryLength, Integer slideShowInterval, Double defaultLatitude, Double defaultLongitude, Integer postItFadeDelay) {
+		Integer maxQueryLength, Integer slideShowInterval, Double defaultLatitude, Double defaultLongitude, Integer postItFadeDelay,
+		/** Desktop presentation id (18/10/2026) - see UserSettingsUpdater.PRESENTATIONS. */
+		String presentation,
+		/** Mobile Camera/Film menu entries shown (26/10/2026). */
+		Boolean onlineCapture) {
+
+	public UpdateMeRequest(Integer maxQueryLength, Integer slideShowInterval, Double defaultLatitude, Double defaultLongitude, Integer postItFadeDelay, String presentation) {
+		this(maxQueryLength, slideShowInterval, defaultLatitude, defaultLongitude, postItFadeDelay, presentation, null);
+	}
+
+	public UpdateMeRequest(Integer maxQueryLength, Integer slideShowInterval, Double defaultLatitude, Double defaultLongitude, Integer postItFadeDelay) {
+		this(maxQueryLength, slideShowInterval, defaultLatitude, defaultLongitude, postItFadeDelay, null);
+	}
 }

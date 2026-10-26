@@ -98,10 +98,16 @@ between them manually; it's decided each time the app loads.
   Selecting a sequence that's never
   been browsed before indexes it automatically; there's nothing to do
   first.
+
+  Within a month, sequences are listed in the order they were taken (by
+  the date of their first picture); a sequence not yet indexed comes
+  last. Years and months are in numerical order.
 - **Center**: the current picture, filling as much of the window as it
   can.
 - **Right — the filmstrip**: every picture in the current sequence, one
-  thumbnail per row, with the current one outlined in white. Click any
+  thumbnail per row, with the current one outlined in white. Pictures
+  are in the order they were taken (oldest first, then by file name);
+  a picture with no date comes last. Click any
   thumbnail to jump straight to it; the strip scrolls and recenters on
   the current picture automatically as you move through the sequence.
   Plain gray tiles may fill out leftover space at the bottom of a short
@@ -224,8 +230,9 @@ sequence's own path:
     change who sees them;
   - sub-sequences move too, but the merge is refused if both have a
     sub-sequence with the same name;
-  - links shared to the removed sequence stop working (links to its
-    pictures keep working).
+  - links shared to the removed sequence keep working, and still show
+    only the pictures that came from it (with its own comment), never
+    the other pictures of the sequence it was merged into.
 
   Merging needs the right to edit both sequences.
 
@@ -264,6 +271,16 @@ picture's own filename and, if known, when it was taken:
 - **Tags** — see below.
 - **Download original** — saves this one picture's full-resolution
   original to your computer.
+- **Rename / Move…** — changes the picture's file name, moves it to
+  another sequence, or both (videos too). Type the new name (the
+  extension, such as `.jpg`, stays as it is), and to move it click
+  **Change…** and pick the sequence in the tree. Its comment, rating and
+  tags go with it, and links already shared for this picture keep
+  working. What it showed from its old sequence (the sequence comment
+  and tags) becomes that of the new sequence — the form reminds you.
+  A name already used in the target sequence is refused: choose another
+  one. Moving a picture into another sequence needs the right to edit
+  that sequence too.
 
 **Tags**, on both popups: a multi-select list — Ctrl/Cmd-click to pick
 more than one. Selecting a tag automatically selects its parent tags too
@@ -445,11 +462,14 @@ separate results grid of its own.
   click the same star again to go back to "any rating".
 - **Since / Till** — a capture-date range, using your browser's own
   native date picker.
+- **Type** — *All* (default), *Photos* or *Videos*: only photos, or only
+  videos. On its own, *Videos* lists every video you can see.
 
 How the filters combine: **Search text** and **Tags** are alternatives
 to each other — a picture matches if *either* one matches, not only if
-both do. **Minimum rating** and the date range then narrow that result
-further, on top of the text/tags match. Leave every filter empty and
+both do. **Minimum rating**, the date range and **Type** then narrow that
+result further, on top of the text/tags match: *Videos* with the text
+"Camargue" gives the Camargue videos only. Leave every filter empty and
 nothing is searched at all.
 
 Above the picture, the match count ("1 match" in the screenshot above)
@@ -679,9 +699,28 @@ full control within that one group, same as any other role would.
 
 Two independent forms:
 - **User settings** — slideshow delay (§2.2), default map position for
-  a sequence with no location of its own (§7), and how long the post-it
-  comment stays visible after you stop hovering it (§2) — for one user
-  at a time. An Admin gets a picker to choose which user (defaulting to
+  a sequence with no location of its own (§7), how long the post-it
+  comment stays visible after you stop hovering it (§2), and the
+  **Presentation (desktop)** — the look of the desktop screens:
+  - *Dark Gallery* — the original dark look (default);
+  - *Bright Gallery* — light backgrounds and dark text;
+  - *Titanium Gallery* — medium grey with dark text and satin metal buttons;
+  - *Green Wilderness Gallery* — deep forest greens;
+  - *Old Rose Gallery* — soft dusty pink with dark plum text;
+  - *Deep Blue Gallery* — deep night navy;
+  - *Lagoon Gallery* — turquoise with dark teal text.
+
+  and **Online capture (mobile)** — off by default. When ticked, the
+  mobile menu also shows **Camera** and **Film** (§9.3, §11); when not,
+  only **Publish** is offered for adding pictures from a phone.
+
+  The presentation changes as soon as you save your own settings, and is
+  kept on your account, so you get it on any computer you sign in from;
+  the sign-in screen shows the one last used in that browser. The film
+  strip, post-its and stars look the same in every presentation, and the
+  mobile screens keep their own look.
+
+  Each of these settings is for one user at a time. An Admin gets a picker to choose which user (defaulting to
   themselves); a Writer only ever sees and edits their own, with no
   picker at all (§13).
 - **App-wide settings** — for the whole instance, Admin-only (a Writer
@@ -722,7 +761,10 @@ Three independent tools, stacked top to bottom:
   files). Tick as many boxes across as many rows as needed, then
   **Check and execute indexing tasks** — it asks for confirmation first,
   then runs every deletion, then every reset, then every (re)index, in
-  that order.
+  that order. Indexing also picks up videos copied straight onto the
+  server's disk, as long as they're H.264 (the same format check as an
+  upload); others are skipped, since a browser couldn't play them.
+  Videos already in a sequence are always kept.
 - **New directory** — creates an empty sequence at the given
   `year/month/sequence` path, both in the database and as a real folder
   on disk, ready to receive pictures.
@@ -885,13 +927,15 @@ elsewhere also closes whichever panel is open.
 <figcaption>The hamburger menu</figcaption>
 </figure>
 
-Tapping **Menu** instead slides in six entries:
+Tapping **Menu** instead slides in four entries, or six when the
+**Online capture** user setting is on (§8.2, Admin → Configure):
 - **Home** — closes the menu and returns to the home screen (also gets
   you out of any full-screen page below, if one is open).
 - **Go** — switches straight to the navigation panel above (§9.2).
 - **Search** — the mobile search form (§12).
 - **Camera** / **Film** — launch the device's camera directly, for a
-  photo or a video respectively (§11).
+  photo or a video respectively (§11). Only shown with **Online
+  capture** on.
 - **Publish** — the same picture/video upload flow as Go's own
   destination picker feeds into (§11).
 
@@ -1009,7 +1053,7 @@ mobile forms only save once you tap **Save**.
 
 ## 11. Mobile: Publishing, Camera and Filming
 
-All three of the hamburger menu's (§9.3) remaining entries are used to publish new content as the desktop's Publish popup (§3). 
+The hamburger menu's (§9.3) Publish entry, and Camera and Film when the **Online capture** setting is on (§8.2), are used to publish new content as the desktop's Publish popup (§3). 
 
 1. They share the same single checkbox, **Sort by date and create a new
    sequence**, with a sequence name field below it:
@@ -1035,6 +1079,11 @@ on the device.
 sends the selected image files. On a slow mobile connection, photos are
 made smaller automatically before being sent, exactly as on desktop —
 see §3 for how it works and what it means for the stored photo.
+
+   If some files are refused (for example an HEVC video, or a name
+   already used in that sequence), the others are still published. The
+   refused ones stay selected, each listed with the reason; tapping
+   **Upload** again only sends those.
 
 <figure>
 <img src="images/mobile-publish.jpg" alt="Publish, with the device's own file/gallery picker" width="400">
@@ -1072,6 +1121,70 @@ video applies here too (see §3).
 </figure>
 
 
+### 11.1 Sharing from another app to myPhotoDiary
+
+On an **Android** phone, myPhotoDiary can receive pictures and videos
+shared from another app — WhatsApp, the phone's gallery, Google Photos,
+and so on — just as WhatsApp receives them from myPhotoDiary.
+
+**One-time setup**: install myPhotoDiary on the home screen. Open it in
+**Chrome**, **Edge** or **Samsung Internet**, then use the browser menu's
+**Add to Home screen** / **Install app**. myPhotoDiary then appears in
+the phone's share sheet. If you installed it before this feature
+existed, remove it from the home screen and install it again.
+
+Make sure it's really installed, not just a shortcut: an installed app
+is called **myPhotoDiary** (you aren't asked for a name), shows up in the
+phone's app list, and opens without the browser's address bar. If the
+phone asked you to type a name, it created a simple shortcut, which never
+appears in the share sheet — remove it and choose **Install app**
+instead.
+
+**Sharing**: in the other app, select one or several pictures or videos,
+tap **Share** and pick **myPhotoDiary**. The **Publish shared files**
+page opens (after signing in, if needed) with the received files. Choose
+where they go, then tap **Upload**. **Home** cancels and discards the
+received files.
+
+- **Sort by date and create a new sequence**: type a sequence name. Each
+  file is stored under the year and month of its own date, exactly like
+  Publish with this option checked: two files taken in different months
+  end up in two sequences with the same name.
+- **Add to an existing sequence**: every file goes into the folder you
+  choose, and keeps its own date. **Recent** lists the sequence open in
+  **Go** and the last sequences this phone published into — one tap
+  chooses one. Otherwise, under **Browse**, tap a year, a month, a
+  sequence to open it, then **Choose this folder**. Any folder except the
+  root can be chosen, including a year or a month. **✕** next to the
+  chosen folder lets you choose another one.
+
+The phone remembers which of the two options you used last time.
+
+Things to know:
+
+- **Not available on iPhone or iPad**: Apple doesn't let a web app
+  receive shared files. Save the picture to your Photos or Files first,
+  then use Publish.
+- **Dates**: WhatsApp removes the date recorded by the camera from the
+  photos it sends. Such a photo is filed by the date in its file name
+  (`IMG-20250310-WA0001.jpg` → March 2025) when there is one, otherwise
+  by the file's own date, which is often the day it was shared. Check
+  where it landed, and move it if needed (Rename / Move, §2).
+- **Location**: shared photos rarely keep their GPS position (WhatsApp and
+  Android remove it).
+- **Videos**: the same rules as Publish apply — H.264 videos only, up to
+  the maximum size set by your administrator. A video is filed by the
+  file's date, not by the date the camera recorded inside it, so a shared
+  video usually lands in the month it was shared. Move it if needed
+  (Rename / Move, §2).
+- **A file is refused**: the others are still published, and the refused
+  ones stay on the page with the reason (see Upload above).
+- **Nothing happens, or an error page, after choosing myPhotoDiary in the
+  share sheet**: open myPhotoDiary once from its home-screen icon (this
+  happens after the browser's data for the site has been cleared), then
+  share again.
+- Publishing needs the Writer or Admin role, as for Publish.
+
 ## 12. Mobile: Searching
 
 <figure>
@@ -1081,9 +1194,10 @@ video applies here too (see §3).
 
 Reached from the hamburger menu's **Search** entry (§9.3), this is a
 dedicated full-screen form with the same filters as the desktop Search
-screen (§5) — free text, tags, minimum rating, and a date range — and
-the same rules about how they combine: text and tags act as
-alternatives to each other, rating and dates narrow the result further,
+screen (§5) — free text, tags, minimum rating, a date range and the
+type (photos or videos) — and the same rules about how they combine:
+text and tags act as alternatives to each other, rating, dates and type
+narrow the result further,
 and a text search still needs at least 4 characters to count. Tapping
 **Search** with every filter left empty briefly shows a reminder to
 fill something in, rather than running an unfiltered search over the
@@ -1106,7 +1220,7 @@ the rest of that trip".
 
 There's no mobile equivalent of the Admin screen at all. To change your
 own personal settings (slideshow delay, default map position, post-it
-fade delay) — or to do anything administrative at all (users, groups,
+fade delay, online capture) — or to do anything administrative at all (users, groups,
 roles, tags, index management) — sign in from a desktop browser instead
 and see §8. Your own settings specifically live under §8.2, Configure,
 reachable by any signed-in role, not just Admin.

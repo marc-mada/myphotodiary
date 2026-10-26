@@ -37,6 +37,8 @@ export const MIN_TEXT_SEARCH_LENGTH = 4;
  * string. A minimum rating of 0 (the lowest real level, not "no filter")
  * still counts - only `null`/`undefined` means "not set".
  */
-export function hasSearchCriteria({ attributeNames, minRating, fromDate, toDate, text }) {
-	return (attributeNames?.length ?? 0) > 0 || minRating != null || !!fromDate || !!toDate || !!text;
+// `mediaType` ('IMAGE'/'VIDEO', 15/10/2026): photos or videos only - alone,
+// it is a criterion too (e.g. "every video").
+export function hasSearchCriteria({ attributeNames, minRating, fromDate, toDate, text, mediaType }) {
+	return (attributeNames?.length ?? 0) > 0 || minRating != null || !!fromDate || !!toDate || !!text || !!mediaType;
 }

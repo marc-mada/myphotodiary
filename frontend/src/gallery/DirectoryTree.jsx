@@ -45,8 +45,14 @@ import { useForbiddenAwareError } from '../temporaryMessage';
  * (GalleryScreen.handleSelectRoot), not `onSelect`, since a synthetic root
  * "node" has no real indexed/imageCount metadata from listChildren the way
  * an actual child does.
+ *
+ * `refreshPath` ({paths, n}, 19/10/2026) re-fetches the children of those
+ * paths - each node caches its children (and so their image counts) once
+ * fetched, so deleting a picture left the count on its directory's row
+ * stale. Children keep their own expanded/loaded state across the refresh
+ * (same `key`), unlike the full remount GalleryScreen does after an import.
  */
-export function DirectoryTree({ selectedPath, onSelect, onSelectRoot, expandToPath }) {
+export function DirectoryTree({ selectedPath, onSelect, onSelectRoot, expandToPath, refreshPath }) {
 	const { t } = useTranslation();
 	const [rootNodes, setRootNodes] = useState(null);
 	const [error, setError] = useState(null);
@@ -55,6 +61,13 @@ export function DirectoryTree({ selectedPath, onSelect, onSelectRoot, expandToPa
 	useEffect(() => {
 		directoryTreeApi.listChildren('').then(setRootNodes).catch(reportError);
 	}, []);
+
+	useEffect(() => {
+		if (refreshPath?.paths.includes('')) {
+			directoryTreeApi.listChildren('').then(setRootNodes).catch(reportError);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [refreshPath]);
 
 	if (error) return <p className="form-error">{error}</p>;
 
@@ -81,6 +94,7 @@ export function DirectoryTree({ selectedPath, onSelect, onSelectRoot, expandToPa
 						selectedPath={selectedPath}
 						onSelect={onSelect}
 						expandToPath={expandToPath}
+						refreshPath={refreshPath}
 					/>
 				))
 			)}
@@ -88,7 +102,7 @@ export function DirectoryTree({ selectedPath, onSelect, onSelectRoot, expandToPa
 	);
 }
 
-function TreeNode({ node, depth, selectedPath, onSelect, expandToPath }) {
+function TreeNode({ node, depth, selectedPath, onSelect, expandToPath, refreshPath }) {
 	const { t } = useTranslation();
 	const [expanded, setExpanded] = useState(false);
 	const [children, setChildren] = useState(null);
@@ -144,6 +158,13 @@ function TreeNode({ node, depth, selectedPath, onSelect, expandToPath }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [expandToPath]);
 
+	useEffect(() => {
+		if (refreshPath?.paths.includes(node.path) && children !== null) {
+			loadChildren();
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [refreshPath]);
+
 	const isSelected = node.path === selectedPath;
 
 	return (
@@ -177,6 +198,7 @@ function TreeNode({ node, depth, selectedPath, onSelect, expandToPath }) {
 						selectedPath={selectedPath}
 						onSelect={onSelect}
 						expandToPath={expandToPath}
+						refreshPath={refreshPath}
 					/>
 				))}
 		</div>

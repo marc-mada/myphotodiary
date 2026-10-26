@@ -1,0 +1,26 @@
+/*******************************************************************************
+ * Copyright 2014-2026 Marc Lamberton
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ******************************************************************************/
+
+package org.myphotodiary.cms.gallery.dto;
+
+/**
+ * Rename and/or move one picture or video (19/10/2026) - see
+ * DirectoryIndexerService#moveImage. Both optional: {@code newName} null or
+ * blank keeps the current name (its extension can't change);
+ * {@code targetPath} null keeps the current sequence ("" is the root).
+ */
+public record MoveImageRequest(String newName, String targetPath) {
+}

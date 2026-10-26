@@ -15,6 +15,7 @@
  ******************************************************************************/
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AuthImage } from './AuthImage';
 
 /**
@@ -54,7 +55,11 @@ import { AuthImage } from './AuthImage';
  * an indeterminate sweep instead of a stalled 0%.
  */
 export function ProgressiveImage({ src, thumbnailSrc, alt, className, onClick, onDoubleClick, onLoad }) {
+	const { t } = useTranslation();
 	const [finalUrl, setFinalUrl] = useState(null);
+	// A load that failed (missing file, server error): the bar must stop,
+	// otherwise it sweeps forever (26/10/2026).
+	const [failed, setFailed] = useState(false);
 	// null = indeterminate (no usable Content-Length yet/at all), otherwise 0-100.
 	const [progress, setProgress] = useState(null);
 
@@ -68,6 +73,7 @@ export function ProgressiveImage({ src, thumbnailSrc, alt, className, onClick, o
 		const controller = new AbortController();
 		setFinalUrl(null);
 		setProgress(null);
+		setFailed(false);
 
 		async function loadWithProgress() {
 			const response = await fetch(src, {
@@ -110,10 +116,10 @@ export function ProgressiveImage({ src, thumbnailSrc, alt, className, onClick, o
 		}
 
 		const canStream = typeof ReadableStream !== 'undefined' && !!window.fetch;
-		(canStream ? loadWithProgress() : loadWithoutProgress()).catch(() => {
-			// Swallowed on purpose, same as AuthImage (including AbortError
-			// from the cleanup below) - a failed load just leaves the
-			// zoomed thumbnail + bar showing instead of crashing the viewer.
+		(canStream ? loadWithProgress() : loadWithoutProgress()).catch((err) => {
+			// AbortError is just the cleanup below (navigated away). Any other
+			// failure shows a message in place of the bar, never a crash.
+			if (err?.name !== 'AbortError') setFailed(true);
 		});
 
 		return () => {
@@ -129,12 +135,16 @@ export function ProgressiveImage({ src, thumbnailSrc, alt, className, onClick, o
 	return (
 		<div className={`progressive-image ${className ?? ''}`} onClick={onClick} onDoubleClick={onDoubleClick}>
 			{thumbnailSrc && <AuthImage src={thumbnailSrc} alt="" className="progressive-image-thumbnail" />}
-			<div className="progressive-image-progress" aria-hidden="true">
-				<div
-					className={progress == null ? 'progressive-image-progress-bar progressive-image-progress-indeterminate' : 'progressive-image-progress-bar'}
-					style={progress == null ? undefined : { width: `${progress}%` }}
-				/>
-			</div>
+			{failed ? (
+				<p className="progressive-image-error">{t('gallery.imageUnavailable')}</p>
+			) : (
+				<div className="progressive-image-progress" aria-hidden="true">
+					<div
+						className={progress == null ? 'progressive-image-progress-bar progressive-image-progress-indeterminate' : 'progressive-image-progress-bar'}
+						style={progress == null ? undefined : { width: `${progress}%` }}
+					/>
+				</div>
+			)}
 		</div>
 	);
 }

@@ -1033,6 +1033,19 @@ fix:
   has the `@linkPreview` part of §4.2, including `search` in its
   `image|sequence|search` list. Messaging apps also cache previews for a
   while, so try with a newly created link.
+- **myPhotoDiary isn't offered in an Android phone's share sheet**
+  ("Share to myPhotoDiary"). This needs the app installed on the phone's
+  home screen from Chrome, Edge or Samsung Internet, over HTTPS with a
+  valid certificate; an app installed before the version that added
+  sharing must be removed and installed again. Nothing is needed on the server: the
+  shared files are received by the browser itself (the
+  `share-target-sw.js` file, part of the frontend) and then published
+  like any upload. A share answered by a "Not Found"/"405" page means the
+  phone's browser lost that file — opening the app once from its icon
+  restores it. Not available on iPhone/iPad at all. If installing only
+  offered to name a home-screen shortcut, the browser didn't consider
+  the site installable: a certificate the phone doesn't trust is the
+  usual reason (it must be a real certificate, as Caddy provides).
 - **No certificate, or the browser warns about it.** Caddy's log says why
   (`sudo journalctl -u caddy`): usually the hostname doesn't point to this
   server yet, or ports 80/443 don't reach it from the Internet (§4.3).

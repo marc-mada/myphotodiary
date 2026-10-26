@@ -134,6 +134,31 @@ class VideoImportTest {
 		assertThat(Files.exists(folder.resolve(".thumbnails").resolve("keep-me.mp4.jpg"))).isTrue();
 	}
 
+	/**
+	 * 17/10/2026: a video dropped straight on disk is indexed like a picture
+	 * (if playable: H.264), and counted in the tree; a non-H.264 one is
+	 * skipped, not indexed as something nobody could play.
+	 */
+	@Test
+	void indexingADirectory_picksUpPlayableVideosDroppedOnDisk_andCountsThemInTheTree() throws IOException {
+		Path folder = storageRoot.resolve("dropped-videos").resolve("seq");
+		Files.createDirectories(folder);
+		Files.write(folder.resolve("good.mp4"), h264Mp4File("good.mp4").getBytes());
+		Files.write(folder.resolve("bad.mp4"), mpeg4Mp4File("bad.mp4").getBytes());
+
+		assertThat(indexerService.listSubdirectories("dropped-videos")).singleElement()
+				.satisfies(node -> assertThat(node.imageCount()).isEqualTo(2)); // both files are counted
+
+		var result = indexerService.indexDirectory("dropped-videos/seq", null);
+
+		assertThat(imageRepository.findByDirectory_IdOrderByNameAsc(result.id())).singleElement().satisfies(img -> {
+			assertThat(img.getName()).isEqualTo("good.mp4");
+			assertThat(img.getMediaType()).isEqualTo(MediaType.VIDEO);
+		});
+		assertThat(Files.exists(folder.resolve(".thumbnails").resolve("good.mp4.jpg"))).isTrue();
+		assertThat(Files.exists(folder.resolve("bad.mp4"))).isTrue(); // skipped, never deleted
+	}
+
 	@Test
 	void movContainer_h264_importsAsVideo_notMisroutedAsImage() throws IOException {
 		// Real bug found live on iPad (03/09/2026): MobileMoviePage's own

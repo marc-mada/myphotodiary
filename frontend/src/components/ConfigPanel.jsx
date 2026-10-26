@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { appSettingsApi } from '../api/appSettings';
 import { invalidateTargetUploadSeconds } from '../upload/adaptiveShrink';
 import { meApi } from '../api/navigation';
+import { applyPresentation, DEFAULT_PRESENTATION, PRESENTATIONS } from '../presentation';
 import { usersApi } from '../api/users';
 import { useForbiddenAwareError } from '../temporaryMessage';
 
@@ -114,6 +115,12 @@ export function ConfigPanel({ selfOnly = false }) {
 	const [defaultLatitude, setDefaultLatitude] = useState(48.8567);
 	const [defaultLongitude, setDefaultLongitude] = useState(2.3508);
 	const [postItFadeDelay, setPostItFadeDelay] = useState(8);
+	// Desktop presentation (18/10/2026) - applied right away when it's the
+	// signed-in user's own setting being saved (myUserName).
+	const [presentation, setPresentation] = useState(DEFAULT_PRESENTATION);
+	// Mobile Camera/Film menu entries (26/10/2026) - off by default.
+	const [onlineCapture, setOnlineCapture] = useState(false);
+	const [myUserName, setMyUserName] = useState(null);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState(null);
 	const reportError = useForbiddenAwareError(setError);
@@ -153,7 +160,13 @@ export function ConfigPanel({ selfOnly = false }) {
 		// carries `username` on its own, so this is now sourced from /api/me
 		// directly, the same self-service endpoint the selfOnly branch below
 		// already uses for its own purposes).
-		meApi.get().then((me) => setSelectedUserName(me.userName)).catch(reportError);
+		meApi
+			.get()
+			.then((me) => {
+				setSelectedUserName(me.userName);
+				setMyUserName(me.userName);
+			})
+			.catch(reportError);
 	}, [selfOnly]);
 
 	useEffect(() => {
@@ -165,6 +178,8 @@ export function ConfigPanel({ selfOnly = false }) {
 					setDefaultLatitude(me.defaultLatitude);
 					setDefaultLongitude(me.defaultLongitude);
 					setPostItFadeDelay(me.postItFadeDelay);
+					setPresentation(me.presentation ?? DEFAULT_PRESENTATION);
+					setOnlineCapture(Boolean(me.onlineCapture));
 				})
 				.catch(reportError);
 			return;
@@ -177,6 +192,8 @@ export function ConfigPanel({ selfOnly = false }) {
 				setDefaultLatitude(settings.defaultLatitude);
 				setDefaultLongitude(settings.defaultLongitude);
 				setPostItFadeDelay(settings.postItFadeDelay);
+				setPresentation(settings.presentation ?? DEFAULT_PRESENTATION);
+				setOnlineCapture(Boolean(settings.onlineCapture));
 			})
 			.catch(reportError);
 	}, [selfOnly, selectedUserName]);
@@ -191,12 +208,15 @@ export function ConfigPanel({ selfOnly = false }) {
 				defaultLatitude: Number(defaultLatitude),
 				defaultLongitude: Number(defaultLongitude),
 				postItFadeDelay: Number(postItFadeDelay),
+				presentation,
+				onlineCapture,
 			};
 			if (selfOnly) {
 				await meApi.update(patch);
 			} else {
 				await usersApi.updateSettings(selectedUserName, patch);
 			}
+			if (selfOnly || selectedUserName === myUserName) applyPresentation(presentation);
 		} catch (err) {
 			reportError(err);
 		} finally {
@@ -280,6 +300,21 @@ export function ConfigPanel({ selfOnly = false }) {
 						value={postItFadeDelay}
 						onChange={(e) => setPostItFadeDelay(e.target.value)}
 					/>
+				</label>
+				{/* Desktop presentation (18/10/2026) - see presentation.js. */}
+				<label>
+					{t('config.presentation')}
+					<select value={presentation} onChange={(e) => setPresentation(e.target.value)}>
+						{PRESENTATIONS.map((id) => (
+							<option key={id} value={id}>
+								{t(`presentation.${id}`)}
+							</option>
+						))}
+					</select>
+				</label>
+				<label className="config-checkbox">
+					<input type="checkbox" checked={onlineCapture} onChange={(e) => setOnlineCapture(e.target.checked)} />
+					{t('config.onlineCapture')}
 				</label>
 				{error && <p className="form-error">{error}</p>}
 				<button type="submit" disabled={saving}>

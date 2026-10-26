@@ -100,6 +100,10 @@ export function GalleryScreen({ initialTarget, onInitialTargetConsumed }) {
 	// other way to learn about (each TreeNode caches its own children once
 	// fetched).
 	const [treeRefreshKey, setTreeRefreshKey] = useState(0);
+	// Lighter than treeRefreshKey: just re-fetches one path's children (see
+	// DirectoryTree's `refreshPath`) - after a delete, so the deleted
+	// picture's directory row shows its new count.
+	const [treeRefreshPath, setTreeRefreshPath] = useState(null);
 	// Set after an import so DirectoryTree can auto-expand down to (and
 	// select) wherever the file actually landed - auto-sort can put it
 	// somewhere the user was never looking, and hunting for it by hand
@@ -363,6 +367,29 @@ export function GalleryScreen({ initialTarget, onInitialTargetConsumed }) {
 		}
 	}
 
+	// Re-fetches the tree rows showing these directories' picture counts -
+	// each row's count comes with its parent's children. The root row shows
+	// no count.
+	function refreshTreeCounts(directoryPaths) {
+		const parents = directoryPaths.filter(Boolean).map((path) => {
+			const slash = path.lastIndexOf('/');
+			return slash > 0 ? path.slice(0, slash) : '';
+		});
+		if (parents.length > 0) setTreeRefreshPath({ paths: parents, n: Date.now() });
+	}
+
+	// Rename / Move one picture (19/10/2026). Moved elsewhere, it leaves this
+	// sequence's filmstrip; either way the popup closes.
+	async function handleMoveImage(request) {
+		if (currentId == null) return;
+		const updated = await galleryApi.moveImage(currentId, request);
+		setOpenPopup(null);
+		await reloadImages();
+		if (updated.directoryPath !== selectedPath) {
+			refreshTreeCounts([selectedPath, updated.directoryPath]);
+		}
+	}
+
 	async function handleDeleteImage() {
 		if (currentId == null) return;
 		if (!window.confirm(t('gallery.deleteImageConfirm'))) return;
@@ -370,6 +397,7 @@ export function GalleryScreen({ initialTarget, onInitialTargetConsumed }) {
 		try {
 			await galleryApi.removeImage(currentId);
 			await reloadImages();
+			refreshTreeCounts([selectedPath]);
 		} catch (err) {
 			reportError(err);
 		}
@@ -523,6 +551,7 @@ export function GalleryScreen({ initialTarget, onInitialTargetConsumed }) {
 						onSelect={handleSelectNode}
 						onSelectRoot={handleSelectRoot}
 						expandToPath={expandToPath}
+						refreshPath={treeRefreshPath}
 					/>
 				</aside>
 
@@ -578,7 +607,7 @@ export function GalleryScreen({ initialTarget, onInitialTargetConsumed }) {
 
 			{currentImage != null && (
 				<Popup open={openPopup === 'image'} onClose={() => setOpenPopup(null)}>
-					<ImageEditForm image={currentImage} onUpdate={handleUpdateImage} allAttributes={allAttributes} />
+					<ImageEditForm image={currentImage} onUpdate={handleUpdateImage} allAttributes={allAttributes} onMove={handleMoveImage} />
 				</Popup>
 			)}
 

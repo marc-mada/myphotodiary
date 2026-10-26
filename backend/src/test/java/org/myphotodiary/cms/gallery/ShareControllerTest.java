@@ -37,6 +37,7 @@ import org.myphotodiary.cms.gallery.dto.DirectoryResponse;
 import org.myphotodiary.cms.gallery.dto.ImageResponse;
 import org.myphotodiary.cms.gallery.dto.PublicImageResponse;
 import org.myphotodiary.cms.gallery.dto.PublicSequenceResponse;
+import org.myphotodiary.cms.gallery.dto.RenameDirectoryRequest;
 import org.myphotodiary.cms.gallery.dto.ShareLinkResponse;
 import org.myphotodiary.cms.settings.AppSettingsService;
 import org.myphotodiary.cms.user.UserService;
@@ -83,6 +84,8 @@ class ShareControllerTest {
 	private UserService userService;
 	@Autowired
 	private AppSettingsService appSettingsService;
+	@Autowired
+	private DirectoryIndexerService indexerService;
 
 	private Long directoryId;
 	private Authentication auth;
@@ -148,6 +151,39 @@ class ShareControllerTest {
 		PublicSequenceResponse sequence = shareController.publicSequence(directoryId, link.token());
 
 		assertThat(sequence.images()).isEmpty();
+	}
+
+	/**
+	 * 17/10/2026, explicit ask: a link shared for a sequence keeps working
+	 * after that sequence is merged into another, and still shows only the
+	 * pictures that came from it - also after a second merge.
+	 */
+	@Test
+	void sequenceShareToken_afterAMerge_stillShowsOnlyThatSequencesOwnPictures() throws IOException {
+		String base = directoryRepository.findById(directoryId).orElseThrow().getPath();
+		String parent = base.substring(0, base.lastIndexOf('/'));
+		Directory a = directoryRepository.findById(directoryId).orElseThrow();
+		a.setDescription("Comment of A");
+		ImageResponse fromA = galleryService.uploadImage(auth, directoryId, jpegFile("from-a.jpg"));
+		DirectoryResponse b = galleryService.createDirectory(auth, new CreateDirectoryRequest(parent + "/b-" + Long.toString(System.nanoTime(), 36), null));
+		ImageResponse inB = galleryService.uploadImage(auth, b.id(), jpegFile("in-b.jpg"));
+		DirectoryResponse c = galleryService.createDirectory(auth, new CreateDirectoryRequest(parent + "/c-" + Long.toString(System.nanoTime(), 36), null));
+		ShareLinkResponse linkA = shareController.sequenceShareToken(auth, directoryId);
+
+		String bName = b.path().substring(b.path().lastIndexOf('/') + 1);
+		indexerService.renameDirectory(auth, directoryId, new RenameDirectoryRequest(bName, null, null, true));
+		assertThat(directoryRepository.findById(directoryId)).isEmpty();
+
+		PublicSequenceResponse view = shareController.publicSequence(directoryId, linkA.token());
+		assertThat(view.description()).isEqualTo("Comment of A");
+		assertThat(view.images()).extracting(PublicImageResponse::id).containsExactly(fromA.id());
+		assertThat(shareController.publicImage(fromA.id(), linkA.token()).id()).isEqualTo(fromA.id());
+		assertThatThrownBy(() -> shareController.publicImage(inB.id(), linkA.token())).isInstanceOf(InvalidShareTokenException.class);
+
+		// B merged into C: A's old link still shows A's picture only.
+		String cName = c.path().substring(c.path().lastIndexOf('/') + 1);
+		indexerService.renameDirectory(auth, b.id(), new RenameDirectoryRequest(cName, null, null, true));
+		assertThat(shareController.publicSequence(directoryId, linkA.token()).images()).extracting(PublicImageResponse::id).containsExactly(fromA.id());
 	}
 
 	@Test

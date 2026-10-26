@@ -27,6 +27,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import javax.imageio.ImageIO;
@@ -44,6 +45,7 @@ import org.myphotodiary.cms.gallery.dto.BatchIndexResult;
 import org.myphotodiary.cms.gallery.dto.CreateAttributeRequest;
 import org.myphotodiary.cms.gallery.dto.DirectoryResponse;
 import org.myphotodiary.cms.gallery.dto.DirectoryTreeNode;
+import org.myphotodiary.cms.gallery.dto.MoveImageRequest;
 import org.myphotodiary.cms.gallery.dto.RenameDirectoryRequest;
 import org.myphotodiary.cms.gallery.dto.UpdateDirectoryDetailRequest;
 import org.myphotodiary.cms.user.Group;
@@ -60,6 +62,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.FileSystemUtils;
 
 /**
  * Exercises the filesystem side of directory indexing against a real temp
@@ -126,6 +129,35 @@ class DirectoryIndexerServiceTest {
 		assertThat(nodes.get(0).name()).isEqualTo("sub1");
 		assertThat(nodes.get(0).imageCount()).isEqualTo(2);
 		assertThat(nodes.get(0).indexed()).isFalse();
+	}
+
+	@Test
+	void listSubdirectories_ofAMonth_sortsSequencesByTheirEarliestPicture() throws IOException {
+		// 26/10/2026: a month's sequences in the order they were taken, not by name.
+		String suffix = Long.toString(System.nanoTime(), 36);
+		String month = "1955/07";
+		String late = "a-late-" + suffix, early = "z-early-" + suffix, undated = "m-undated-" + suffix;
+		for (String name : List.of(late, early, undated)) {
+			Path dir = storageRoot.resolve(month).resolve(name);
+			Files.createDirectories(dir);
+			writeFile(dir, "p.jpg");
+		}
+		setOnlyCaptureDate(indexerService.indexDirectory(month + "/" + late, null).id(), LocalDateTime.of(1955, 7, 20, 10, 0));
+		setOnlyCaptureDate(indexerService.indexDirectory(month + "/" + early, null).id(), LocalDateTime.of(1955, 7, 3, 10, 0));
+
+		List<String> ours = indexerService.listSubdirectories(month).stream().map(DirectoryTreeNode::name)
+				.filter(n -> n.endsWith(suffix)).toList();
+
+		assertThat(ours).containsExactly(early, late, undated);
+		// Other levels keep name order.
+		assertThat(indexerService.listSubdirectories(month + "/" + late)).isEmpty();
+	}
+
+	private void setOnlyCaptureDate(Long directoryId, LocalDateTime date) {
+		for (Image image : imageRepository.findByDirectory_IdOrderByNameAsc(directoryId)) {
+			image.setCaptureDate(date);
+			imageRepository.saveAndFlush(image);
+		}
 	}
 
 	@Test
@@ -283,6 +315,40 @@ class DirectoryIndexerServiceTest {
 		Files.createDirectories(storageRoot.resolve(path));
 
 		assertThatThrownBy(() -> indexerService.indexDirectory(path, null)).isInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	void indexDirectory_alreadyIndexedFolderNowEmpty_removesStaleRowsAndKeepsTheSequence() throws IOException {
+		// year/month/seq1/seq2 with the pictures moved from seq1 into seq2:
+		// seq1's rows pointed at files that are gone and could never be
+		// cleaned, because re-indexing an empty folder was refused.
+		String path = "2026/08/parent-" + Long.toString(System.nanoTime(), 36);
+		Path dir = storageRoot.resolve(path);
+		Path child = dir.resolve("child");
+		Files.createDirectories(child);
+		writeFile(dir, "moved.jpg");
+		DirectoryResponse first = indexerService.indexDirectory(path, null);
+
+		Files.move(dir.resolve("moved.jpg"), child.resolve("moved.jpg"));
+		DirectoryResponse second = indexerService.indexDirectory(path, null);
+
+		assertThat(second.id()).isEqualTo(first.id());
+		assertThat(imageRepository.findByDirectory_IdOrderByNameAsc(first.id())).isEmpty();
+	}
+
+	@Test
+	void indexDirectory_indexedFolderMissingFromDisk_throwsAndKeepsRows() throws IOException {
+		// Storage not mounted: the folder itself is gone. Must not empty the index.
+		String path = "2026/08/unmounted-" + Long.toString(System.nanoTime(), 36);
+		Path dir = storageRoot.resolve(path);
+		Files.createDirectories(dir);
+		writeFile(dir, "kept.jpg");
+		DirectoryResponse first = indexerService.indexDirectory(path, null);
+
+		FileSystemUtils.deleteRecursively(dir);
+
+		assertThatThrownBy(() -> indexerService.indexDirectory(path, null)).isInstanceOf(IllegalStateException.class);
+		assertThat(imageRepository.findByDirectory_IdOrderByNameAsc(first.id())).extracting(Image::getName).containsExactly("kept.jpg");
 	}
 
 	@Test
@@ -817,6 +883,177 @@ class DirectoryIndexerServiceTest {
 		assertThat(directoryRepository.findByPath(base)).isPresent();
 		assertThat(directoryRepository.findByPath(base + "/trip/day1")).isPresent();
 		assertThat(directoryRepository.findByPath(base + "/trip/empty-day")).isEmpty();
+	}
+
+	// Rename/move one picture (19/10/2026).
+
+	@Test
+	void moveImage_renameInPlace_movesFileAndDerivatives_keepsTheSameRow() throws IOException {
+		String path = "2026/08/move-rename-" + Long.toString(System.nanoTime(), 36);
+		Path dir = storageRoot.resolve(path);
+		Files.createDirectories(dir);
+		writeFile(dir, "old.jpg");
+		DirectoryResponse directory = indexerService.indexDirectory(path, null);
+		Image image = imageRepository.findByDirectory_IdOrderByNameAsc(directory.id()).get(0);
+		image.setDescription("kept");
+		Long id = image.getId();
+
+		indexerService.moveImage(auth, id, new MoveImageRequest("new name.JPG", null));
+
+		Image moved = imageRepository.findById(id).orElseThrow();
+		assertThat(moved.getName()).isEqualTo("new name.JPG");
+		assertThat(moved.getDescription()).isEqualTo("kept");
+		assertThat(Files.exists(dir.resolve("old.jpg"))).isFalse();
+		assertThat(Files.exists(dir.resolve("new name.JPG"))).isTrue();
+		assertThat(Files.exists(dir.resolve(".thumbnails").resolve("new name.JPG"))).isTrue();
+		assertThat(Files.exists(dir.resolve(".webimg").resolve("new name.JPG"))).isTrue();
+		assertThat(Files.exists(dir.resolve(".thumbnails").resolve("old.jpg"))).isFalse();
+	}
+
+	@Test
+	void moveImage_caseOnlyRename_changesTheNameOnDiskToo() throws IOException {
+		// On a case-insensitive disk (macOS) "P.jpg" already "exists" as
+		// p.jpg itself, and a plain Files.move between the two does nothing.
+		String path = "2026/08/move-case-" + Long.toString(System.nanoTime(), 36);
+		Path dir = storageRoot.resolve(path);
+		Files.createDirectories(dir);
+		writeFile(dir, "p.jpg");
+		DirectoryResponse directory = indexerService.indexDirectory(path, null);
+		Long id = imageRepository.findByDirectory_IdOrderByNameAsc(directory.id()).get(0).getId();
+
+		indexerService.moveImage(auth, id, new MoveImageRequest("P.jpg", null));
+
+		assertThat(imageRepository.findById(id).orElseThrow().getName()).isEqualTo("P.jpg");
+		try (var files = Files.list(dir)) {
+			assertThat(files.map(f -> f.getFileName().toString()).filter(n -> !n.startsWith("."))).containsExactly("P.jpg");
+		}
+		try (var thumbnails = Files.list(dir.resolve(".thumbnails"))) {
+			assertThat(thumbnails.map(f -> f.getFileName().toString())).containsExactly("P.jpg");
+		}
+	}
+
+	@Test
+	void moveImage_toAnotherSequence_movesFilesAndRow_andUpdatesTheTargetDate() throws IOException {
+		String base = "2026/08/move-seq-" + Long.toString(System.nanoTime(), 36);
+		Path dirA = storageRoot.resolve(base + "/a");
+		Path dirB = storageRoot.resolve(base + "/b");
+		Files.createDirectories(dirA);
+		Files.createDirectories(dirB);
+		writeFile(dirA, "p.jpg");
+		writeFile(dirA, "stays.jpg");
+		writeFile(dirB, "q.jpg");
+		DirectoryResponse a = indexerService.indexDirectory(base + "/a", null);
+		DirectoryResponse b = indexerService.indexDirectory(base + "/b", null);
+		Image image = imageRepository.findByDirectory_IdOrderByNameAsc(a.id()).get(0);
+		Long id = image.getId();
+
+		indexerService.moveImage(auth, id, new MoveImageRequest(null, "/" + base + "/b/"));
+
+		assertThat(imageRepository.findById(id).orElseThrow().getDirectory().getId()).isEqualTo(b.id());
+		assertThat(imageRepository.findByDirectory_IdOrderByNameAsc(a.id())).extracting(Image::getName).containsExactly("stays.jpg");
+		assertThat(imageRepository.findByDirectory_IdOrderByNameAsc(b.id())).extracting(Image::getName).containsExactly("p.jpg", "q.jpg");
+		assertThat(Files.exists(dirA.resolve("p.jpg"))).isFalse();
+		assertThat(Files.exists(dirB.resolve("p.jpg"))).isTrue();
+		assertThat(Files.exists(dirB.resolve(".thumbnails").resolve("p.jpg"))).isTrue();
+		assertThat(directoryRepository.findById(b.id()).orElseThrow().getSequenceDate()).isNotNull();
+	}
+
+	@Test
+	void moveImage_nameAlreadyTaken_byAPictureOrAPlainFile_isRefused_andNothingMoves() throws IOException {
+		String base = "2026/08/move-clash-" + Long.toString(System.nanoTime(), 36);
+		Path dirA = storageRoot.resolve(base + "/a");
+		Path dirB = storageRoot.resolve(base + "/b");
+		Files.createDirectories(dirA);
+		Files.createDirectories(dirB);
+		writeFile(dirA, "p.jpg");
+		writeFile(dirA, "other.jpg");
+		writeFile(dirB, "p.jpg");
+		DirectoryResponse a = indexerService.indexDirectory(base + "/a", null);
+		indexerService.indexDirectory(base + "/b", null);
+		Files.writeString(dirA.resolve("notes.jpg"), "a plain file, never indexed");
+		Image image = imageRepository.findByDirectory_IdOrderByNameAsc(a.id()).stream().filter(i -> i.getName().equals("p.jpg")).findFirst().orElseThrow();
+
+		assertThatThrownBy(() -> indexerService.moveImage(auth, image.getId(), new MoveImageRequest(null, base + "/b")))
+				.isInstanceOf(ImageAlreadyExistsException.class);
+		assertThatThrownBy(() -> indexerService.moveImage(auth, image.getId(), new MoveImageRequest("other.jpg", null)))
+				.isInstanceOf(ImageAlreadyExistsException.class);
+		assertThatThrownBy(() -> indexerService.moveImage(auth, image.getId(), new MoveImageRequest("notes.jpg", null)))
+				.isInstanceOf(ImageAlreadyExistsException.class);
+
+		assertThat(Files.exists(dirA.resolve("p.jpg"))).isTrue();
+		assertThat(imageRepository.findById(image.getId()).orElseThrow().getName()).isEqualTo("p.jpg");
+	}
+
+	@Test
+	void moveImage_badNameOrTarget_isRefused_andNothingMoves() throws IOException {
+		String path = "2026/08/move-guard-" + Long.toString(System.nanoTime(), 36);
+		Path dir = storageRoot.resolve(path);
+		Files.createDirectories(dir.resolve("sub"));
+		writeFile(dir, "p.jpg");
+		DirectoryResponse directory = indexerService.indexDirectory(path, null);
+		Long id = imageRepository.findByDirectory_IdOrderByNameAsc(directory.id()).get(0).getId();
+
+		for (String badName : List.of("a/b.jpg", "a\\b.jpg", ".hidden.jpg", "p.png", "p")) {
+			assertThatThrownBy(() -> indexerService.moveImage(auth, id, new MoveImageRequest(badName, null)))
+					.as(badName).isInstanceOf(IllegalArgumentException.class);
+		}
+		for (String badTarget : List.of(path + "/../" + path.substring(path.lastIndexOf('/') + 1) + "/sub", path + "/.thumbnails")) {
+			assertThatThrownBy(() -> indexerService.moveImage(auth, id, new MoveImageRequest(null, badTarget)))
+					.as(badTarget).isInstanceOf(IllegalArgumentException.class);
+		}
+		assertThatThrownBy(() -> indexerService.moveImage(auth, id, new MoveImageRequest(null, path + "/does-not-exist")))
+				.isInstanceOf(DirectoryNotFoundException.class);
+
+		assertThat(Files.exists(dir.resolve("p.jpg"))).isTrue();
+		assertThat(imageRepository.findById(id).orElseThrow().getDirectory().getId()).isEqualTo(directory.id());
+	}
+
+	@Test
+	void moveImage_intoAFolderNeverIndexed_indexesItFirst() throws IOException {
+		String base = "2026/08/move-disk-" + Long.toString(System.nanoTime(), 36);
+		Files.createDirectories(storageRoot.resolve(base + "/a"));
+		Files.createDirectories(storageRoot.resolve(base + "/b"));
+		writeFile(storageRoot.resolve(base + "/a"), "p.jpg");
+		writeFile(storageRoot.resolve(base + "/b"), "dropped-on-disk.jpg");
+		DirectoryResponse a = indexerService.indexDirectory(base + "/a", null);
+		Long id = imageRepository.findByDirectory_IdOrderByNameAsc(a.id()).get(0).getId();
+
+		indexerService.moveImage(auth, id, new MoveImageRequest(null, base + "/b"));
+
+		Directory target = directoryRepository.findByPath(base + "/b").orElseThrow();
+		assertThat(imageRepository.findByDirectory_IdOrderByNameAsc(target.getId())).extracting(Image::getName)
+				.containsExactly("dropped-on-disk.jpg", "p.jpg");
+	}
+
+	@Test
+	void moveImage_writerNeedsEditRightsOnTheTargetGroupToo() throws IOException {
+		userService.createUser(new CreateUserRequest("move-writer", "Move Writer", "x", "move-home-" + System.nanoTime(), "WRITER"));
+		Authentication writerAuth = new UsernamePasswordAuthenticationToken("move-writer", null);
+		String homeGroup = userService.listRoleAssignments("move-writer").get(0).groupName();
+		String otherGroup = "move-other-" + System.nanoTime();
+		groupRepository.save(new Group(otherGroup, "", LocalDate.now()));
+
+		String base = "2026/08/move-rbac-" + Long.toString(System.nanoTime(), 36);
+		Files.createDirectories(storageRoot.resolve(base + "/mine"));
+		Files.createDirectories(storageRoot.resolve(base + "/theirs"));
+		writeFile(storageRoot.resolve(base + "/mine"), "p.jpg");
+		writeFile(storageRoot.resolve(base + "/theirs"), "q.jpg");
+		DirectoryResponse mine = indexerService.indexDirectory(base + "/mine", homeGroup);
+		indexerService.indexDirectory(base + "/theirs", otherGroup);
+		Long id = imageRepository.findByDirectory_IdOrderByNameAsc(mine.id()).get(0).getId();
+
+		// Renaming within its own sequence: EDIT_IMAGE is enough.
+		indexerService.moveImage(writerAuth, id, new MoveImageRequest("renamed.jpg", null));
+
+		userService.addRoleAssignment("move-writer", new CreateRoleAssignmentRequest(otherGroup, "READER"));
+		assertThatThrownBy(() -> indexerService.moveImage(writerAuth, id, new MoveImageRequest(null, base + "/theirs")))
+				.isInstanceOf(AccessDeniedException.class);
+		assertThat(Files.exists(storageRoot.resolve(base + "/mine/renamed.jpg"))).isTrue();
+
+		userService.removeRoleAssignment("move-writer", otherGroup);
+		userService.addRoleAssignment("move-writer", new CreateRoleAssignmentRequest(otherGroup, "WRITER"));
+		indexerService.moveImage(writerAuth, id, new MoveImageRequest(null, base + "/theirs"));
+		assertThat(Files.exists(storageRoot.resolve(base + "/theirs/renamed.jpg"))).isTrue();
 	}
 
 	// A real, decodable JPEG - indexDirectory() runs Thumbnailator against

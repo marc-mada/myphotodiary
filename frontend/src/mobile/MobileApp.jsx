@@ -18,7 +18,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext';
 import { galleryApi } from '../api/gallery';
-import { attributeApi, directoryTreeApi, searchApi } from '../api/navigation';
+import { attributeApi, directoryTreeApi, meApi, searchApi } from '../api/navigation';
 import { shareApi } from '../api/share';
 import { appSettingsApi } from '../api/appSettings';
 import { copyTextToClipboard } from '../clipboard';
@@ -34,6 +34,8 @@ import { MobileImageEditPage } from './MobileImageEditPage';
 import { MobileSequenceEditPage } from './MobileSequenceEditPage';
 import { MobileSearchPage } from './MobileSearchPage';
 import { MobileUploadPage } from './MobileUploadPage';
+import { MobileSharedFilesPage } from './MobileSharedFilesPage';
+import { clearSharedIdFromLocation, sharedIdFromLocation } from './sharedFiles';
 import { MobileCameraPage } from './MobileCameraPage';
 import { MobileMoviePage } from './MobileMoviePage';
 import { useForbiddenAwareError } from '../temporaryMessage';
@@ -110,7 +112,11 @@ export function MobileApp() {
 
 	const [postitVisible, setPostitVisible] = useState(false);
 	const [activePanel, setActivePanel] = useState(null); // null | 'nav' | 'menu'
-	const [activePage, setActivePage] = useState(null); // null | 'search' | 'upload' | 'camera' | 'movie' | 'imgEdit' | 'dirEdit'
+	// Files shared to the app from another one (21/10/2026) - `?shared=<id>`,
+	// set by public/share-target-sw.js; read once, at session start (the
+	// address keeps it through sign-in).
+	const [sharedId] = useState(sharedIdFromLocation);
+	const [activePage, setActivePage] = useState(sharedId ? 'shared' : null); // null | 'search' | 'upload' | 'camera' | 'movie' | 'imgEdit' | 'dirEdit' | 'shared'
 	// 'single' (one image at a time, MobileImageViewer) | 'mosaic' (grid of
 	// the current sequence's thumbnails, MobileMosaicView) - explicit ask,
 	// 09/09/2026. 'single' is the session-start default (explicit ask); a
@@ -154,8 +160,18 @@ export function MobileApp() {
 	const [shareStatus, setShareStatus] = useState(null);
 	const reportShareError = useForbiddenAwareError(setShareError);
 
+	// "Online capture" user setting (26/10/2026, explicit ask) - the menu's
+	// Camera and Film entries are hidden unless it is on. Edited from the
+	// desktop Admin -> Configure screen (mobile has none). Hidden while
+	// /api/me is still loading or failed: off is the default.
+	const [onlineCapture, setOnlineCapture] = useState(false);
+
 	useEffect(() => {
 		attributeApi.listAll().then(setAllAttributes).catch(reportError);
+		meApi
+			.get()
+			.then((me) => setOnlineCapture(Boolean(me.onlineCapture)))
+			.catch(() => {});
 	}, []);
 
 	// One function for both "browse into a subdirectory" (explorer.changeDir)
@@ -356,6 +372,23 @@ export function MobileApp() {
 
 	if (activePage === 'search') {
 		return <MobileSearchPage allAttributes={allAttributes} onSearch={handleSearch} onHome={() => setActivePage(null)} onLogout={logout} />;
+	}
+	if (activePage === 'shared') {
+		return (
+			<MobileSharedFilesPage
+				sharedId={sharedId}
+				currentDirectoryPath={currentPath}
+				onImported={(result) => {
+					clearSharedIdFromLocation();
+					handleImported(result);
+				}}
+				onHome={() => {
+					clearSharedIdFromLocation();
+					setActivePage(null);
+				}}
+				onLogout={logout}
+			/>
+		);
 	}
 	if (activePage === 'upload') {
 		return (
@@ -632,8 +665,8 @@ export function MobileApp() {
 					onHome={() => setActivePage(null)}
 					onGo={toggleNav}
 					onSearch={() => setActivePage('search')}
-					onCamera={() => setActivePage('camera')}
-					onFilm={() => setActivePage('movie')}
+					onCamera={onlineCapture ? () => setActivePage('camera') : null}
+					onFilm={onlineCapture ? () => setActivePage('movie') : null}
 					onPublish={() => setActivePage('upload')}
 				/>
 			</MobileSlidePanel>

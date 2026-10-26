@@ -139,17 +139,20 @@ class ShareLinkPreviewControllerTest {
 	}
 
 	@Test
-	void sequencePreview_includesOgImagePointingAtTheFirstImageByName() throws IOException {
-		// "b.jpg" uploaded first but "a.jpg" sorts first by name - same
-		// ordering PublicSequenceResponse's own filmstrip already uses
-		// (findByDirectory_IdOrderByNameAsc), not upload order.
-		galleryService.uploadImage(auth, directoryId, jpegFile("b.jpg"));
-		ImageResponse first = galleryService.uploadImage(auth, directoryId, jpegFile("a.jpg"));
+	void sequencePreview_includesOgImagePointingAtTheEarliestPicture() throws IOException {
+		// "b.jpg" sorts after "a.jpg" by name but was taken earlier - a
+		// sequence's display order is capture date first
+		// (ImageRepository.findSequenceInDisplayOrder), like its filmstrip.
+		galleryService.uploadImage(auth, directoryId, jpegFile("a.jpg"));
+		ImageResponse earliest = galleryService.uploadImage(auth, directoryId, jpegFile("b.jpg"));
+		Image b = imageRepository.findById(earliest.id()).orElseThrow();
+		b.setCaptureDate(LocalDateTime.of(2001, 1, 1, 12, 0));
+		imageRepository.saveAndFlush(b);
 		ShareLinkResponse link = shareController.sequenceShareToken(auth, directoryId);
 
 		String html = previewController.sequencePreview(directoryId, link.token(), httpsRequest());
 
-		assertThat(html).contains("og:image").contains("/api/public/images/" + first.id() + "/web?token=");
+		assertThat(html).contains("og:image").contains("/api/public/images/" + earliest.id() + "/web?token=");
 	}
 
 	@Test

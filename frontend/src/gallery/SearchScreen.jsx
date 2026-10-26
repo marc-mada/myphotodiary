@@ -105,6 +105,8 @@ export function SearchScreen({ onGoToDirectory }) {
 	// equivalent at all before this.
 	const [fromDate, setFromDate] = useState('');
 	const [toDate, setToDate] = useState('');
+	// Photos or videos only (15/10/2026) - '' for both, else 'IMAGE'/'VIDEO'.
+	const [mediaType, setMediaType] = useState('');
 	// Free-text filter (03/09/2026, explicit ask, revised same day) -
 	// matched against the tag/sequence-name/sequence-description/image-
 	// description disjunction - see GalleryService.search's own doc for the
@@ -217,6 +219,7 @@ export function SearchScreen({ onGoToDirectory }) {
 					fromDate: fromDate || null,
 					toDate: toDate || null,
 					text: debouncedText || null,
+				mediaType: mediaType || null,
 					page: targetPage,
 				});
 				setImages((prev) => (targetPage === 0 ? result.images : [...prev, ...result.images]));
@@ -233,7 +236,7 @@ export function SearchScreen({ onGoToDirectory }) {
 				fetchingPageRef.current = null;
 			}
 		},
-		[selectedAttributes, minRating, fromDate, toDate, debouncedText],
+		[selectedAttributes, minRating, fromDate, toDate, debouncedText, mediaType],
 	);
 
 	const hasCriteria = hasSearchCriteria({
@@ -242,6 +245,7 @@ export function SearchScreen({ onGoToDirectory }) {
 		fromDate: fromDate || null,
 		toDate: toDate || null,
 		text: debouncedText || null,
+				mediaType: mediaType || null,
 	});
 
 	// New filters -> start over from page 0. Skipped entirely while nothing
@@ -263,7 +267,7 @@ export function SearchScreen({ onGoToDirectory }) {
 		}
 		runSearch(0);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [selectedAttributes, minRating, fromDate, toDate, debouncedText]);
+	}, [selectedAttributes, minRating, fromDate, toDate, debouncedText, mediaType]);
 
 	// Memoized so the filmstrip's IntersectionObserver effect (which depends
 	// on this identity) only actually resubscribes when `page` itself
@@ -321,6 +325,16 @@ export function SearchScreen({ onGoToDirectory }) {
 	// backend's own tree-traversal order, not sorted by name.
 	const sortedAttributes = [...allAttributes].sort((a, b) => a.name.localeCompare(b.name));
 
+	// Rename / Move (19/10/2026): the picture stays in the results (it still
+	// matches the same criteria, except for tags/comment inherited from its
+	// old sequence - a new search shows that), with its new name/sequence.
+	async function handleMoveImage(request) {
+		if (currentId == null) return;
+		const updated = await galleryApi.moveImage(currentId, request);
+		setImages((prev) => prev.map((img) => (img.id === currentId ? updated : img)));
+		setOpenPopup(null);
+	}
+
 	async function handleUpdateImage(patch) {
 		if (currentId == null) return;
 		setError(null);
@@ -364,6 +378,7 @@ export function SearchScreen({ onGoToDirectory }) {
 				fromDate: fromDate || null,
 				toDate: toDate || null,
 				text: debouncedText || null,
+				mediaType: mediaType || null,
 			});
 			await copyTextToClipboard(`${window.location.origin}/share/search/${shared.id}?token=${encodeURIComponent(shared.token)}`);
 			if (shared.truncated) {
@@ -509,6 +524,7 @@ export function SearchScreen({ onGoToDirectory }) {
 				fromDate: fromDate || null,
 				toDate: toDate || null,
 				text: debouncedText || null,
+				mediaType: mediaType || null,
 				page: currentPage,
 				pageSize: 100,
 			});
@@ -591,6 +607,14 @@ export function SearchScreen({ onGoToDirectory }) {
 					<label className="search-date-bound">
 						{t('search.till')}
 						<input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} min={fromDate || undefined} />
+					</label>
+					<label className="search-media-type">
+						{t('search.mediaType')}
+						<select value={mediaType} onChange={(e) => setMediaType(e.target.value)}>
+							<option value="">{t('search.mediaTypeAll')}</option>
+							<option value="IMAGE">{t('search.mediaTypeImage')}</option>
+							<option value="VIDEO">{t('search.mediaTypeVideo')}</option>
+						</select>
 					</label>
 
 					{/* Thin grey line separating the criteria above from the two
@@ -693,7 +717,7 @@ export function SearchScreen({ onGoToDirectory }) {
 
 			{currentImage != null && (
 				<Popup open={openPopup === 'image'} onClose={() => setOpenPopup(null)}>
-					<ImageEditForm image={currentImage} onUpdate={handleUpdateImage} allAttributes={allAttributes} />
+					<ImageEditForm image={currentImage} onUpdate={handleUpdateImage} allAttributes={allAttributes} onMove={handleMoveImage} />
 				</Popup>
 			)}
 		</div>

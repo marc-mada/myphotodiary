@@ -194,7 +194,6 @@ public class ImageStorageService {
 
 	private void placeVideoOriginal(String directoryPath, String videoName, Path source, boolean move) {
 		Path original = resolveOriginal(directoryPath, videoName);
-		Path frame = null;
 		try {
 			Files.createDirectories(original.getParent());
 			if (move) {
@@ -202,6 +201,25 @@ public class ImageStorageService {
 			} else {
 				Files.copy(source, original, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 			}
+		} catch (IOException e) {
+			throw new UncheckedIOException("Failed to store video " + directoryPath + "/" + videoName, e);
+		}
+		generateVideoThumbnail(directoryPath, videoName);
+	}
+
+	/** Whether a video's thumbnail ({@code .thumbnails/<name>.jpg}) exists. */
+	public boolean videoThumbnailExists(String directoryPath, String videoName) {
+		return Files.exists(resolveVideoThumbnail(directoryPath, videoName));
+	}
+
+	/**
+	 * (Re)writes a stored video's thumbnail from its first frame - after an
+	 * upload, and (17/10/2026) when indexing a video dropped on disk.
+	 */
+	public void generateVideoThumbnail(String directoryPath, String videoName) {
+		Path original = resolveOriginal(directoryPath, videoName);
+		Path frame = null;
+		try {
 			frame = videoThumbnailExtractor.extractFirstFrame(original);
 			// resolveVideoThumbnail, not resolveThumbnail - a video's
 			// thumbnail path needs its own `.jpg` extension regardless of
@@ -883,6 +901,33 @@ public class ImageStorageService {
 	}
 
 	/** Image-extension file names directly inside a directory on disk (not recursive), sorted - empty list if the directory doesn't exist. */
+	/**
+	 * Pictures and videos directly in a directory, sorted (17/10/2026) - what
+	 * indexing and the tree's counts use, so a video dropped on disk is
+	 * indexed and a video-only folder doesn't show 0.
+	 */
+	public List<String> listMediaFileNames(String directoryPath) {
+		Path dir = resolveDirectory(directoryPath);
+		if (!Files.isDirectory(dir)) {
+			return List.of();
+		}
+		try (Stream<Path> entries = Files.list(dir)) {
+			return entries
+					.filter(Files::isRegularFile)
+					.map(p -> p.getFileName().toString())
+					.filter(n -> !n.startsWith(".") && (hasImageExtension(n) || hasVideoExtension(n)))
+					.sorted()
+					.collect(Collectors.toList());
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	static boolean hasVideoExtension(String fileName) {
+		int dot = fileName.lastIndexOf('.');
+		return dot >= 0 && ImportService.VIDEO_EXTENSIONS.contains(fileName.substring(dot + 1).toLowerCase(Locale.ROOT));
+	}
+
 	public List<String> listImageFileNames(String directoryPath) {
 		Path dir = resolveDirectory(directoryPath);
 		if (!Files.isDirectory(dir)) {

@@ -34,6 +34,7 @@
     "publishPictures": "Publish pictures",
     "sequenceGeolocation": "Sequence geolocation",
     "noImagesYet": "No images yet - drop some in below to get started.",
+    "imageUnavailable": "This picture's file was not found on the server. Re-indexing the sequence (Admin → Index management) removes it from the list.",
     "deleteImageConfirm": "Delete this image? This cannot be undone.",
     "linkCopied": "Link copied!"
   },
@@ -69,6 +70,21 @@
     "downloading": "Downloading…",
     "tags": "Tags (selecting a tag also selects its parents)",
     "newTagPlaceholder": "new tag name"
+  },
+  "imageMove": {
+    "open": "Rename / Move…",
+    "title": "Rename / Move",
+    "name": "Name",
+    "sequence": "Sequence:",
+    "change": "Change…",
+    "closeTree": "Close the tree",
+    "inheritedWarning": "The comment and tags this picture shows from its current sequence will be those of the new sequence. Its own comment, rating and tags stay with it.",
+    "invalidName": "A name can't be empty, contain / or \\, or start with a dot.",
+    "nameTaken": "A file named {{name}} already exists there.",
+    "targetMissing": "This sequence no longer exists.",
+    "save": "Rename / Move",
+    "saving": "Moving…",
+    "cancel": "Cancel"
   },
   "imageViewer": {
     "delete": "Delete",
@@ -114,7 +130,11 @@
     "downloadFailed_other": "{{count}} pictures failed to download.",
     "copySearchLink": "Copy a shareable link to this search result",
     "shareTruncated_one": "Link copied — only the first of the {{total}} matching pictures is shared (maximum allowed).",
-    "shareTruncated_other": "Link copied — only the first {{count}} of the {{total}} matching pictures are shared (maximum allowed)."
+    "shareTruncated_other": "Link copied — only the first {{count}} of the {{total}} matching pictures are shared (maximum allowed).",
+    "mediaType": "Type",
+    "mediaTypeAll": "All",
+    "mediaTypeImage": "Photos",
+    "mediaTypeVideo": "Videos"
   },
   "upload": {
     "sortAndCreateSequence": "Sort by date and create a new sequence",
@@ -175,7 +195,9 @@
     "appVersion": "myPhotoDiary version {{version}}",
     "targetUploadSeconds": "Target average upload time per photo (seconds)",
     "maxShareSize": "Maximum pictures in a shared search result",
-    "allowVideoSharing": "Allow sharing videos by link (streamed from this server to anyone who has the link)"
+    "allowVideoSharing": "Allow sharing videos by link (streamed from this server to anyone who has the link)",
+    "presentation": "Presentation (desktop)",
+    "onlineCapture": "Online capture (mobile: Camera and Film in the menu)"
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "new/directory/path",
@@ -266,11 +288,33 @@
     "picturesSelected_one": "{{count}} picture selected",
     "picturesSelected_other": "{{count}} pictures selected",
     "upload": "Upload",
-    "shareSearchResult": "Share search result"
+    "shareSearchResult": "Share search result",
+    "sharedFilesTitle": "Publish shared files",
+    "sharedFilesUnavailable": "The shared files are no longer available - share them again.",
+    "sharedFilesHint": "Each file goes to year/month/<sequence name below>",
+    "addToExistingSequence": "Add to an existing sequence",
+    "sharedFilesExistingHint": "Every file goes into the folder chosen below and keeps its own date.",
+    "importTarget": "Target: {{path}}",
+    "changeImportTarget": "Choose another folder",
+    "recentSequences": "Recent",
+    "browseSequences": "Browse",
+    "chooseThisFolder": "Choose this folder",
+    "noSubfolders": "No sub-folders",
+    "someFilesFailed_one": "{{count}} file could not be published:",
+    "someFilesFailed_other": "{{count}} files could not be published:"
   },
   "share": {
     "loading": "Loading…",
     "invalidLink": "This link is invalid or has expired.",
     "searchEmpty": "The pictures of this shared search result are no longer available."
+  },
+  "presentation": {
+    "dark": "Dark Gallery",
+    "bright": "Bright Gallery",
+    "titanium": "Titanium Gallery",
+    "green-wilderness": "Green Wilderness Gallery",
+    "old-rose": "Old Rose Gallery",
+    "deep-blue": "Deep Blue Gallery",
+    "lagoon": "Lagoon Gallery"
   }
 }

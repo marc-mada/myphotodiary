@@ -11,15 +11,298 @@
 	box-sizing: border-box;
 }
 
+/*************************************
+** Desktop presentations (18/10/2026, explicit ask) - the look a user picks
+** in User settings (Admin -> Configure; stored per user, V17). Every colour
+** the desktop screens use comes from one of the variables below; :root
+** holds the original look, "Dark Gallery", with its exact former values,
+** so it renders as before. The other presentations only redefine the
+** variables, under `html[data-presentation=...]`, which presentation.js
+** sets on the desktop UI only - mobile never gets the attribute and keeps
+** the defaults. Kept the same in every presentation on purpose: the film
+** strip (film.png), the post-it, the stars and the image editor (the app's
+** own identity, Design.md decision #8).
+*************************************/
+:root {
+	--mpd-page-bg: rgb(25, 25, 25);
+	--mpd-panel-bg: black;
+	--mpd-text: rgb(220, 220, 220);
+	--mpd-text-muted: rgb(150, 150, 150);
+	--mpd-line: rgb(90, 90, 90);
+	--mpd-edge: rgb(35, 35, 35);
+	--mpd-tab-active-bg: rgb(90, 90, 90);
+	--mpd-tab-active-text: white;
+	--mpd-button-bg: rgb(225, 225, 225);
+	--mpd-button-text: #1a1a1a;
+	--mpd-button-border: #ccc;
+	--mpd-button-hover-text: #1d4ed8;
+	--mpd-power-button-text: black;
+	--mpd-surface: white;
+	--mpd-surface-text: #1a1a1a;
+	--mpd-accent: #7ec8ff;
+	--mpd-tree-hover: rgb(30, 30, 30);
+	--mpd-tree-selected: rgb(40, 40, 60);
+	--mpd-tree-count-bg: rgb(40, 40, 40);
+	--mpd-tree-root-icon: white;
+	--mpd-frame-bg: black;
+	--mpd-frame-image: url('/legacy/dotted-pattern.png');
+	--mpd-login-screen-bg: #242424;
+	--mpd-login-error: #f87171;
+	--mpd-shadow: #111;
+	--mpd-scrollbar-track: rgb(20, 20, 20);
+	--mpd-scrollbar-thumb: rgb(125, 125, 125);
+	--mpd-scrollbar-thumb-low: rgb(100, 100, 100);
+	--mpd-scrollbar-thumb-high: rgb(150, 150, 150);
+	--mpd-scrollbar-thumb-hover-low: rgb(120, 120, 120);
+	--mpd-scrollbar-thumb-hover-high: rgb(170, 170, 170);
+	--mpd-scrollbar-thumb-active-low: rgb(140, 140, 140);
+	--mpd-scrollbar-thumb-active-high: rgb(190, 190, 190);
+}
+
+/* Bright Gallery - warm off-white, dark text; photos on a light grey frame. */
+:root[data-presentation='bright'] {
+	--mpd-page-bg: #eceae6;
+	--mpd-panel-bg: #fbfaf8;
+	--mpd-text: #232220;
+	--mpd-text-muted: #6b675f;
+	--mpd-line: #c4bfb7;
+	--mpd-edge: #d6d1ca;
+	--mpd-tab-active-bg: #4a4744;
+	--mpd-tab-active-text: white;
+	--mpd-button-bg: white;
+	--mpd-button-text: #1a1a1a;
+	--mpd-button-border: #c4bfb7;
+	--mpd-button-hover-text: #1d4ed8;
+	--mpd-power-button-text: #1a1a1a;
+	--mpd-surface: white;
+	--mpd-surface-text: #1a1a1a;
+	--mpd-accent: #1d5fbf;
+	--mpd-tree-hover: #efece7;
+	--mpd-tree-selected: #dbe5f4;
+	--mpd-tree-count-bg: #e2ded8;
+	--mpd-tree-root-icon: #4a4744;
+	--mpd-frame-bg: #e3e0db;
+	--mpd-frame-image: none;
+	--mpd-login-screen-bg: #dedad3;
+	--mpd-login-error: #b91c1c;
+	--mpd-shadow: rgba(0, 0, 0, 0.25);
+	--mpd-scrollbar-track: #e3e0db;
+	--mpd-scrollbar-thumb: #b3aea6;
+	--mpd-scrollbar-thumb-low: #a7a29a;
+	--mpd-scrollbar-thumb-high: #c6c1b9;
+	--mpd-scrollbar-thumb-hover-low: #99948c;
+	--mpd-scrollbar-thumb-hover-high: #b9b4ac;
+	--mpd-scrollbar-thumb-active-low: #8b867e;
+	--mpd-scrollbar-thumb-active-high: #aca79f;
+}
+
+/* Bright/Titanium/Old Rose/Lagoon show the banner copy with dark lettering
+   (AppBanner), on its transparent background - no backing box. Titanium and
+   Lagoon only: the grey "off" star (star.png) would nearly vanish on their
+   medium tones, so it is darkened there. */
+:root[data-presentation='titanium'] .br-widget a:not(.br-active),
+:root[data-presentation='lagoon'] .br-widget a:not(.br-active) {
+	filter: brightness(0.5);
+}
+
+/* Titanium Gallery - built around a medium grey (18/10/2026, revised on
+   request: "different from Dark Gallery, around a medium grey"): medium
+   grey bars and frame with dark text, satin metal buttons, a finely
+   brushed photo frame. */
+:root[data-presentation='titanium'] {
+	--mpd-page-bg: #878c91;
+	--mpd-panel-bg: #9a9fa4;
+	--mpd-text: #14171a;
+	--mpd-text-muted: #34393e;
+	--mpd-line: #686e74;
+	--mpd-edge: #767c82;
+	--mpd-tab-active-bg: #3b4146;
+	--mpd-tab-active-text: white;
+	--mpd-button-bg: #d6dade;
+	--mpd-button-text: #14171a;
+	--mpd-button-border: #686e74;
+	--mpd-button-hover-text: #0a4a94;
+	--mpd-power-button-text: #14171a;
+	--mpd-surface: #e7eaed;
+	--mpd-surface-text: #14171a;
+	--mpd-accent: #0c3b74;
+	--mpd-tree-hover: #a8adb2;
+	--mpd-tree-selected: #bcc8d4;
+	--mpd-tree-count-bg: #858b91;
+	--mpd-tree-root-icon: #2a2f34;
+	--mpd-frame-bg: #80868b;
+	--mpd-frame-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px),
+		linear-gradient(to bottom, #8c9297, #757b80);
+	--mpd-login-screen-bg: #878c91;
+	--mpd-login-error: #8b0000;
+	--mpd-shadow: rgba(0, 0, 0, 0.35);
+	--mpd-scrollbar-track: #80868b;
+	--mpd-scrollbar-thumb: #4f555a;
+	--mpd-scrollbar-thumb-low: #454b50;
+	--mpd-scrollbar-thumb-high: #62686d;
+	--mpd-scrollbar-thumb-hover-low: #3b4146;
+	--mpd-scrollbar-thumb-hover-high: #565c61;
+	--mpd-scrollbar-thumb-active-low: #31373c;
+	--mpd-scrollbar-thumb-active-high: #4a5055;
+}
+
+/* Green Wilderness Gallery - deep forest greens, moss accents, pale fern text. */
+:root[data-presentation='green-wilderness'] {
+	--mpd-page-bg: #1e2a20;
+	--mpd-panel-bg: #142017;
+	--mpd-text: #e3ead6;
+	--mpd-text-muted: #9fb08f;
+	--mpd-line: #4e6a45;
+	--mpd-edge: #2b3a2d;
+	--mpd-tab-active-bg: #5b7d4c;
+	--mpd-tab-active-text: white;
+	--mpd-button-bg: #e6ecd9;
+	--mpd-button-text: #1f2a1c;
+	--mpd-button-border: #a5b596;
+	--mpd-button-hover-text: #2f6b22;
+	--mpd-power-button-text: #1f2a1c;
+	--mpd-surface: #f5f7ef;
+	--mpd-surface-text: #1f2a1c;
+	--mpd-accent: #b5dc86;
+	--mpd-tree-hover: #213024;
+	--mpd-tree-selected: #2f4a2b;
+	--mpd-tree-count-bg: #2b3a2d;
+	--mpd-frame-bg: #0f1811;
+	--mpd-frame-image: radial-gradient(ellipse at center, rgba(80, 115, 65, 0.22), transparent 70%);
+	--mpd-login-screen-bg: #1e2a20;
+	--mpd-login-error: #f4a3a3;
+	--mpd-shadow: #070b08;
+	--mpd-scrollbar-track: #121c14;
+	--mpd-scrollbar-thumb: #5b7d4c;
+	--mpd-scrollbar-thumb-low: #4e6a45;
+	--mpd-scrollbar-thumb-high: #7a9a68;
+	--mpd-scrollbar-thumb-hover-low: #5b7d4c;
+	--mpd-scrollbar-thumb-hover-high: #89a977;
+	--mpd-scrollbar-thumb-active-low: #6a8c5a;
+	--mpd-scrollbar-thumb-active-high: #98b886;
+}
+
+/* Old Rose Gallery - dusty pink bars, deep plum text; photos on a soft rose frame. */
+:root[data-presentation='old-rose'] {
+	--mpd-page-bg: #e8d3d1;
+	--mpd-panel-bg: #f6ebea;
+	--mpd-text: #3b2326;
+	--mpd-text-muted: #6b4c4f;
+	--mpd-line: #c9a5a5;
+	--mpd-edge: #dcc0be;
+	--mpd-tab-active-bg: #8c5a5f;
+	--mpd-tab-active-text: white;
+	--mpd-button-bg: #fbf3f2;
+	--mpd-button-text: #3b2326;
+	--mpd-button-border: #c9a5a5;
+	--mpd-button-hover-text: #9b2d4a;
+	--mpd-power-button-text: #3b2326;
+	--mpd-surface: #fffafa;
+	--mpd-surface-text: #3b2326;
+	--mpd-accent: #9b3b55;
+	--mpd-tree-hover: #f0dfdd;
+	--mpd-tree-selected: #e6c4c6;
+	--mpd-tree-count-bg: #e3cbc9;
+	--mpd-tree-root-icon: #8c5a5f;
+	--mpd-frame-bg: #dfc6c4;
+	--mpd-frame-image: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.35), transparent 70%);
+	--mpd-login-screen-bg: #e2cbc9;
+	--mpd-login-error: #9b1c1c;
+	--mpd-shadow: rgba(60, 20, 30, 0.25);
+	--mpd-scrollbar-track: #e3cbc9;
+	--mpd-scrollbar-thumb: #b48a8c;
+	--mpd-scrollbar-thumb-low: #a77d80;
+	--mpd-scrollbar-thumb-high: #c39a9c;
+	--mpd-scrollbar-thumb-hover-low: #9a7073;
+	--mpd-scrollbar-thumb-hover-high: #b68d8f;
+	--mpd-scrollbar-thumb-active-low: #8d6366;
+	--mpd-scrollbar-thumb-active-high: #a98083;
+}
+
+/* Deep Blue Gallery - night navy bars, pale blue text, a faint blue glow behind the photo. */
+:root[data-presentation='deep-blue'] {
+	--mpd-page-bg: #0f1a2e;
+	--mpd-panel-bg: #0a1222;
+	--mpd-text: #dbe6f5;
+	--mpd-text-muted: #8ea3c2;
+	--mpd-line: #34507a;
+	--mpd-edge: #1b2a44;
+	--mpd-tab-active-bg: #2f5d9c;
+	--mpd-tab-active-text: white;
+	--mpd-button-bg: #dfe8f5;
+	--mpd-button-text: #0f1a2e;
+	--mpd-button-border: #8ea3c2;
+	--mpd-button-hover-text: #1d4ed8;
+	--mpd-power-button-text: #0f1a2e;
+	--mpd-surface: #f3f6fb;
+	--mpd-surface-text: #0f1a2e;
+	--mpd-accent: #7ec8ff;
+	--mpd-tree-hover: #15233b;
+	--mpd-tree-selected: #22406b;
+	--mpd-tree-count-bg: #1b2a44;
+	--mpd-tree-root-icon: #dbe6f5;
+	--mpd-frame-bg: #070d19;
+	--mpd-frame-image: radial-gradient(ellipse at center, rgba(60, 100, 170, 0.25), transparent 70%);
+	--mpd-login-screen-bg: #0f1a2e;
+	--mpd-login-error: #f4a3a3;
+	--mpd-shadow: #04070d;
+	--mpd-scrollbar-track: #0a1222;
+	--mpd-scrollbar-thumb: #34507a;
+	--mpd-scrollbar-thumb-low: #2b4469;
+	--mpd-scrollbar-thumb-high: #4a6a98;
+	--mpd-scrollbar-thumb-hover-low: #34507a;
+	--mpd-scrollbar-thumb-hover-high: #5a7aa8;
+	--mpd-scrollbar-thumb-active-low: #3f5f8c;
+	--mpd-scrollbar-thumb-active-high: #6a8ab8;
+}
+
+/* Lagoon Gallery - medium turquoise bars, deep teal text; photos on a
+   water-like frame, lighter at the top. */
+:root[data-presentation='lagoon'] {
+	--mpd-page-bg: #6cbcbc;
+	--mpd-panel-bg: #84cccb;
+	--mpd-text: #0b2e33;
+	--mpd-text-muted: #173f44;
+	--mpd-line: #3f8f92;
+	--mpd-edge: #57a6a8;
+	--mpd-tab-active-bg: #0e5e66;
+	--mpd-tab-active-text: white;
+	--mpd-button-bg: #e6f7f6;
+	--mpd-button-text: #0b2e33;
+	--mpd-button-border: #3f8f92;
+	--mpd-button-hover-text: #0a5ea8;
+	--mpd-power-button-text: #0b2e33;
+	--mpd-surface: #f2fbfa;
+	--mpd-surface-text: #0b2e33;
+	--mpd-accent: #0a4f8a;
+	--mpd-tree-hover: #95d6d4;
+	--mpd-tree-selected: #b9e6f0;
+	--mpd-tree-count-bg: #5fb0b1;
+	--mpd-tree-root-icon: #0e4a50;
+	--mpd-frame-bg: #4fa6a8;
+	--mpd-frame-image: linear-gradient(to bottom, #5cb4b6, #3f9395);
+	--mpd-login-screen-bg: #6cbcbc;
+	--mpd-login-error: #8b0000;
+	--mpd-shadow: rgba(0, 40, 45, 0.35);
+	--mpd-scrollbar-track: #57a6a8;
+	--mpd-scrollbar-thumb: #1f6f74;
+	--mpd-scrollbar-thumb-low: #1a6267;
+	--mpd-scrollbar-thumb-high: #2a7f84;
+	--mpd-scrollbar-thumb-hover-low: #155459;
+	--mpd-scrollbar-thumb-hover-high: #237378;
+	--mpd-scrollbar-thumb-active-low: #10474b;
+	--mpd-scrollbar-thumb-active-high: #1d666b;
+}
+
 body {
 	margin: 0;
 	font-family: system-ui, sans-serif;
-	background: rgb(25, 25, 25);
+	background: var(--mpd-page-bg);
 	/* Matches idx.css's body text color - light gray was chosen there to read
 	   against this same dark background, so it's kept as a pair. Card-like
 	   surfaces below (login form, modal, table) stay white/dark-on-white and
 	   override this explicitly - only the bare page background is shared. */
-	color: rgb(220, 220, 220);
+	color: var(--mpd-text);
 }
 
 /* Session-cookie auth (18/09/2026) - the brief window while AuthProvider's
@@ -56,7 +339,7 @@ body {
 *************************************/
 * {
 	scrollbar-width: thin;
-	scrollbar-color: rgb(125, 125, 125) rgb(20, 20, 20);
+	scrollbar-color: var(--mpd-scrollbar-thumb) var(--mpd-scrollbar-track);
 }
 
 ::-webkit-scrollbar {
@@ -65,11 +348,11 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-	background: rgb(20, 20, 20);
+	background: var(--mpd-scrollbar-track);
 }
 
 ::-webkit-scrollbar-corner {
-	background: rgb(20, 20, 20);
+	background: var(--mpd-scrollbar-track);
 }
 
 /* `to top` reads bottom-to-top in CSS gradient syntax (the first color
@@ -77,9 +360,9 @@ body {
    its end): rgb(100,100,100) at the bottom, rgb(150,150,150) at the top,
    exactly as asked, not the reverse. */
 ::-webkit-scrollbar-thumb {
-	background: linear-gradient(to top, rgb(100, 100, 100), rgb(150, 150, 150));
+	background: linear-gradient(to top, var(--mpd-scrollbar-thumb-low), var(--mpd-scrollbar-thumb-high));
 	border-radius: 6px;
-	border: 2px solid rgb(20, 20, 20);
+	border: 2px solid var(--mpd-scrollbar-track);
 }
 
 /* Hover/active brighten both stops by the same amount, keeping the bottom-
@@ -87,11 +370,11 @@ body {
    not just decoration, same spirit as the rest of this app's button hover
    states. */
 ::-webkit-scrollbar-thumb:hover {
-	background: linear-gradient(to top, rgb(120, 120, 120), rgb(170, 170, 170));
+	background: linear-gradient(to top, var(--mpd-scrollbar-thumb-hover-low), var(--mpd-scrollbar-thumb-hover-high));
 }
 
 ::-webkit-scrollbar-thumb:active {
-	background: linear-gradient(to top, rgb(140, 140, 140), rgb(190, 190, 190));
+	background: linear-gradient(to top, var(--mpd-scrollbar-thumb-active-low), var(--mpd-scrollbar-thumb-active-high));
 }
 
 /* The sign-in *screen* (03/09/2026, explicit ask, corrected same day - an
@@ -106,7 +389,7 @@ body {
 	min-height: 100vh;
 	display: flex;
 	flex-direction: column;
-	background: #242424;
+	background: var(--mpd-login-screen-bg);
 }
 
 .login-screen-body {
@@ -126,15 +409,15 @@ body {
 	display: flex;
 	flex-direction: column;
 	gap: 0.75rem;
-	background: black;
-	color: rgb(220, 220, 220);
+	background: var(--mpd-panel-bg);
+	color: var(--mpd-text);
 	padding: 2rem;
 	border-radius: 8px;
-	box-shadow: -3px 6px 10px #111;
+	box-shadow: -3px 6px 10px var(--mpd-shadow);
 }
 
 .login-form .form-error {
-	color: #f87171;
+	color: var(--mpd-login-error);
 }
 
 .login-form label,
@@ -183,11 +466,66 @@ body {
    white-surface convention (Design.md decision #8) untouched by this. */
 button {
 	padding: 0.4rem 0.9rem;
-	border: 1px solid #ccc;
+	border: 1px solid var(--mpd-button-border);
 	border-radius: 4px;
-	background: rgb(225, 225, 225);
-	color: #1a1a1a;
+	background: var(--mpd-button-bg);
+	color: var(--mpd-button-text);
 	cursor: pointer;
+}
+
+/* Convex buttons (18/10/2026, explicit ask - "make all buttons appear a
+   bit convex with a button color gradient"), desktop only (same scoping
+   as the bold text just below - mobile buttons keep their own styling).
+   The gradient is derived from each presentation's own --mpd-button-bg
+   (lighter at the top, darker at the bottom), with a thin top highlight
+   and a small drop shadow; pressed, it flips and the shadow goes inside.
+   FilePond's own round buttons (inside .uploader) are left alone. */
+.app-shell button:not([class*='filepond']),
+.login-form button {
+	background: linear-gradient(
+		to bottom,
+		color-mix(in srgb, var(--mpd-button-bg) 45%, white),
+		var(--mpd-button-bg) 55%,
+		color-mix(in srgb, var(--mpd-button-bg) 80%, black)
+	);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.6),
+		0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.app-shell button:not([class*='filepond']):active:not(:disabled),
+.login-form button:active:not(:disabled) {
+	background: linear-gradient(
+		to top,
+		color-mix(in srgb, var(--mpd-button-bg) 55%, white),
+		color-mix(in srgb, var(--mpd-button-bg) 85%, black)
+	);
+	box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+/* The selected tab: same relief, in its own (darker) colour. */
+.app-shell .screen-nav button.active,
+.app-shell .user-admin-toolbar button.active {
+	background: linear-gradient(
+		to bottom,
+		color-mix(in srgb, var(--mpd-tab-active-bg) 70%, white),
+		var(--mpd-tab-active-bg) 55%,
+		color-mix(in srgb, var(--mpd-tab-active-bg) 75%, black)
+	);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Same relief for the language picker, which sits among the buttons. */
+.app-shell .language-switcher {
+	background: linear-gradient(
+		to bottom,
+		color-mix(in srgb, var(--mpd-button-bg) 45%, white),
+		var(--mpd-button-bg) 55%,
+		color-mix(in srgb, var(--mpd-button-bg) 80%, black)
+	);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.6),
+		0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 /* Bold button text (03/09/2026, explicit ask, Desktop UI only) - scoped to
@@ -217,7 +555,7 @@ button {
    comfortably AA-compliant - while still reading clearly as blue, not
    navy/near-black. */
 button:hover {
-	color: #1d4ed8;
+	color: var(--mpd-button-hover-text);
 }
 
 /* Sign in (LoginForm) / Sign out (App.jsx's shared nav-account, top-right
@@ -229,8 +567,8 @@ button:hover {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.35rem;
-	background: rgb(225, 225, 225);
-	color: black;
+	background: var(--mpd-button-bg);
+	color: var(--mpd-power-button-text);
 }
 
 /* Sign-Out specifically, not Sign-In - both share .power-button, so this
@@ -273,7 +611,7 @@ button:hover {
 	gap: 0.75rem;
 	margin-bottom: 1rem;
 	padding-bottom: 0.75rem;
-	border-bottom: 2px solid rgb(90, 90, 90);
+	border-bottom: 2px solid var(--mpd-line);
 }
 
 .user-admin-toolbar .tab-button {
@@ -284,9 +622,9 @@ button:hover {
    medium-grey-when-selected treatment as the top-level .screen-nav tabs
    (explicit ask: no more blue for a "selected" state anywhere). */
 .user-admin-toolbar button.active {
-	background: rgb(90, 90, 90);
-	color: white;
-	border-color: rgb(90, 90, 90);
+	background: var(--mpd-tab-active-bg);
+	color: var(--mpd-tab-active-text);
+	border-color: var(--mpd-tab-active-bg);
 }
 
 /* The "Config" pane from legacy admin.jsp (ConfigPanel.jsx) - a simple
@@ -300,8 +638,8 @@ button:hover {
 	align-items: flex-end;
 	flex-wrap: wrap;
 	gap: 0.75rem;
-	background: white;
-	color: #1a1a1a;
+	background: var(--mpd-surface);
+	color: var(--mpd-surface-text);
 	padding: 0.75rem 1rem;
 	border-radius: 6px;
 	margin-top: 0.5rem;
@@ -346,7 +684,7 @@ button:hover {
 .app-version {
 	margin: 0.75rem 0 0;
 	font-size: 0.85rem;
-	color: rgb(150, 150, 150);
+	color: var(--mpd-text-muted);
 }
 
 .config-panel-form h4 {
@@ -364,14 +702,14 @@ button:hover {
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
-	background: black;
+	background: var(--mpd-panel-bg);
 	margin-top: 0.5rem;
 	max-width: 900px;
 }
 
 .index-management-box {
-	background: white;
-	color: #1a1a1a;
+	background: var(--mpd-surface);
+	color: var(--mpd-surface-text);
 	padding: 0.75rem 1rem;
 	border-radius: 6px;
 }
@@ -442,8 +780,8 @@ button:hover {
 table {
 	width: 100%;
 	border-collapse: collapse;
-	background: white;
-	color: #1a1a1a;
+	background: var(--mpd-surface);
+	color: var(--mpd-surface-text);
 }
 
 .user-table th,
@@ -468,7 +806,7 @@ table {
 	position: sticky;
 	top: 0;
 	z-index: 1;
-	background: white;
+	background: var(--mpd-surface);
 	box-shadow: inset 0 -1px 0 #cfcfcf;
 }
 
@@ -508,8 +846,8 @@ table {
 }
 
 .modal {
-	background: white;
-	color: #1a1a1a;
+	background: var(--mpd-surface);
+	color: var(--mpd-surface-text);
 	padding: 1.5rem;
 	border-radius: 8px;
 	width: 360px;
@@ -558,9 +896,9 @@ table {
 	align-items: center;
 	gap: 0.5rem;
 	padding: 0.75rem 1rem;
-	background: black;
+	background: var(--mpd-panel-bg);
 	flex-shrink: 0;
-	border-bottom: 2px solid rgb(90, 90, 90);
+	border-bottom: 2px solid var(--mpd-line);
 	/* Explicit height (02/09/2026), matching what the authenticated nav's
 	   own real content (TabBar + LanguageSwitcher/Sign-out, ~55.8px
 	   measured) already produces without ever having to set one - no effect
@@ -576,9 +914,9 @@ table {
 }
 
 .screen-nav button.active {
-	background: rgb(90, 90, 90);
-	color: white;
-	border-color: rgb(90, 90, 90);
+	background: var(--mpd-tab-active-bg);
+	color: var(--mpd-tab-active-text);
+	border-color: var(--mpd-tab-active-bg);
 }
 
 /* Equal-width tabs (Gallery/Search/Admin, and the same class reused for
@@ -653,7 +991,7 @@ table {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
-	color: rgb(220, 220, 220);
+	color: var(--mpd-text);
 }
 
 /* Language switcher (28/08/2026, explicit ask - replaces "Signed in as
@@ -666,10 +1004,10 @@ table {
 .language-switcher {
 	padding: 0.3rem 0.5rem;
 	font-size: 0.8rem;
-	border: 1px solid #ccc;
+	border: 1px solid var(--mpd-button-border);
 	border-radius: 4px;
-	background: rgb(225, 225, 225);
-	color: #1a1a1a;
+	background: var(--mpd-button-bg);
+	color: var(--mpd-button-text);
 	cursor: pointer;
 }
 
@@ -746,9 +1084,9 @@ table {
 	   (not merged into one shared rule with .photo-full-screen) since the
 	   two still differ on everything else (flow vs fixed positioning, the
 	   border-bottom below, padding, z-index). */
-	background-color: black;
-	background-image: url('/legacy/dotted-pattern.png');
-	border-bottom: 3px solid rgb(35, 35, 35);
+	background-color: var(--mpd-frame-bg);
+	background-image: var(--mpd-frame-image);
+	border-bottom: 3px solid var(--mpd-edge);
 	min-width: 0;
 	min-height: 0;
 }
@@ -760,7 +1098,7 @@ table {
    image") - column here stacks them message-above-image as asked, with no
    effect on GalleryScreen's single-child case. */
 .photo-frame-empty {
-	color: rgb(150, 150, 150);
+	color: var(--mpd-text-muted);
 	flex-direction: column;
 	gap: 0.75rem;
 }
@@ -827,6 +1165,21 @@ table {
 	border-radius: 3px;
 	background: rgb(210, 210, 210);
 	transition: width 150ms ease;
+}
+
+/* Shown instead of the bar when the picture could not be loaded. */
+.progressive-image-error {
+	position: absolute;
+	left: 10%;
+	right: 10%;
+	top: 50%;
+	transform: translateY(-50%);
+	margin: 0;
+	padding: 0.5rem 1rem;
+	border-radius: 4px;
+	background: rgba(0, 0, 0, 0.6);
+	color: rgb(220, 220, 220);
+	text-align: center;
 }
 
 /* No usable Content-Length to compute a real percentage from - a sweeping
@@ -906,8 +1259,8 @@ table {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background-color: black;
-	background-image: url('/legacy/dotted-pattern.png');
+	background-color: var(--mpd-frame-bg);
+	background-image: var(--mpd-frame-image);
 	padding: 5px;
 	z-index: 110;
 }
@@ -1025,8 +1378,8 @@ table {
 	   right - instead of eating into #rslider's own width. */
 	width: 184px;
 	flex-shrink: 0;
-	background-color: rgb(25, 25, 25);
-	border-bottom: 3px solid rgb(35, 35, 35);
+	background-color: var(--mpd-page-bg);
+	border-bottom: 3px solid var(--mpd-edge);
 	/* Thin grey divider along the filmstrip's own left edge (25/09/2026,
 	   explicit ask, width/color corrected same day to exactly match
 	   .screen-nav's own border-bottom - the horizontal line below the main
@@ -1037,7 +1390,7 @@ table {
 	   Search (both render #rsidebar - this file's own comment further down
 	   on "Search screen... shares... #rsidebar with the" Gallery screen),
 	   so one rule covers both automatically. */
-	border-left: 2px solid rgb(90, 90, 90);
+	border-left: 2px solid var(--mpd-line);
 	overflow-y: auto;
 	/* Full height even when empty/partially empty (28/08/2026, explicit ask
 	   - reverts a previous explicit ask that had set align-self:flex-start
@@ -1263,8 +1616,8 @@ div.br-widget {
 	min-height: 320px;
 	max-width: 640px;
 	border-radius: 0 0 0 16px;
-	box-shadow: -3px 6px 10px #111;
-	background-color: black;
+	box-shadow: -3px 6px 10px var(--mpd-shadow);
+	background-color: var(--mpd-panel-bg);
 	z-index: 121;
 }
 
@@ -1437,7 +1790,7 @@ div.br-widget {
 	padding: 20px;
 	overflow-y: auto;
 	box-sizing: border-box;
-	color: rgb(220, 220, 220);
+	color: var(--mpd-text);
 }
 
 .gallery-popup-body h3 {
@@ -1448,7 +1801,7 @@ div.br-widget {
    description, muted like .search-result-count's own metadata-not-content
    treatment on this same dark surface. */
 .image-capture-date {
-	color: rgb(150, 150, 150);
+	color: var(--mpd-text-muted);
 	font-size: 0.85rem;
 	margin: 0.25rem 0 0;
 }
@@ -1522,18 +1875,18 @@ div.br-widget {
 	gap: 0.75rem;
 	min-height: 0;
 	overflow-y: auto;
-	background: black;
+	background: var(--mpd-panel-bg);
 	/* Same border-bottom as .photo-frame (01/09/2026, explicit ask) - so
 	   both bottom edges line up precisely instead of only .photo-frame
 	   showing this line. */
-	border-bottom: 3px solid rgb(35, 35, 35);
+	border-bottom: 3px solid var(--mpd-edge);
 	/* Thin grey divider along the sidebar's own right edge (25/09/2026,
 	   explicit ask, width/color corrected same day to exactly match
 	   .screen-nav's own border-bottom, same 2px/rgb(90,90,90) as #rsidebar's
 	   own border-left just above - that comment has the full reasoning).
 	   `.gallery-sidebar` is itself the shared class already used by both
 	   Gallery and Search's own sidebars, so one rule here covers both. */
-	border-right: 2px solid rgb(90, 90, 90);
+	border-right: 2px solid var(--mpd-line);
 	padding: 0 1rem 1rem;
 }
 
@@ -1580,7 +1933,7 @@ div.br-widget {
    fancytree overrides (black bg, light-gray text, thin gray border), not
    fancytree's default skin - see DirectoryTree.jsx's comment. */
 .directory-tree {
-	background: black;
+	background: var(--mpd-panel-bg);
 	border: 1px solid gray;
 	max-height: 50vh;
 	overflow-y: auto;
@@ -1609,7 +1962,7 @@ div.br-widget {
 	flex: 1;
 	min-height: 0;
 	max-height: none;
-	border-color: rgb(90, 90, 90);
+	border-color: var(--mpd-line);
 }
 
 .tree-row {
@@ -1618,20 +1971,20 @@ div.br-widget {
 	gap: 0.35rem;
 	padding: 0.15rem 0.5rem 0.15rem 0;
 	cursor: pointer;
-	color: rgb(220, 220, 220);
+	color: var(--mpd-text);
 	font-size: 0.85rem;
 }
 
 .tree-row:hover {
-	background: rgb(30, 30, 30);
+	background: var(--mpd-tree-hover);
 }
 
 .tree-row-selected {
-	background: rgb(40, 40, 60);
+	background: var(--mpd-tree-selected);
 }
 
 .tree-row-indexed .tree-title {
-	color: #7ec8ff;
+	color: var(--mpd-accent);
 }
 
 /* Attribute drag-and-drop reparenting (AttributeAdmin.jsx) - legacy's
@@ -1642,14 +1995,14 @@ div.br-widget {
 
 .tree-drop-target {
 	background: rgb(37, 99, 235, 0.35);
-	outline: 1px dashed #7ec8ff;
+	outline: 1px dashed var(--mpd-accent);
 	outline-offset: -1px;
 }
 
 .tree-toggle {
 	width: 1rem;
 	text-align: center;
-	color: rgb(150, 150, 150);
+	color: var(--mpd-text-muted);
 	user-select: none;
 }
 
@@ -1665,6 +2018,7 @@ div.br-widget {
 .tree-root-icon svg {
 	width: 0.85rem;
 	height: 0.85rem;
+	fill: var(--mpd-tree-root-icon);
 }
 
 .tree-title {
@@ -1673,15 +2027,15 @@ div.br-widget {
 
 .tree-count {
 	font-size: 0.75rem;
-	color: rgb(150, 150, 150);
-	background: rgb(40, 40, 40);
+	color: var(--mpd-text-muted);
+	background: var(--mpd-tree-count-bg);
 	border-radius: 8px;
 	padding: 0 0.4rem;
 }
 
 .tree-loading,
 .tree-empty {
-	color: rgb(150, 150, 150);
+	color: var(--mpd-text-muted);
 	font-size: 0.85rem;
 	padding: 0.5rem;
 	margin: 0;
@@ -1695,7 +2049,7 @@ div.br-widget {
 
 .tree-actions a {
 	cursor: pointer;
-	color: #7ec8ff;
+	color: var(--mpd-accent);
 	text-decoration: underline;
 }
 
@@ -1786,8 +2140,8 @@ button.danger {
    screen (explicit ask), same shape and unstyled wrapper as
    ConfigPanel/IndexManagementPanel; only its body gets a size/surface. */
 .attribute-admin-body {
-	background: white;
-	color: #1a1a1a;
+	background: var(--mpd-surface);
+	color: var(--mpd-surface-text);
 	padding: 0.75rem 1rem;
 	border-radius: 6px;
 	margin-top: 0.5rem;
@@ -1833,14 +2187,14 @@ button.danger {
 	align-items: center;
 	justify-content: center;
 	gap: 0.4rem;
-	background: rgb(25, 25, 25);
+	background: var(--mpd-page-bg);
 }
 
 /* Same muted grey as the other metadata text on dark grounds (.app-version). */
 .footer-label {
 	font-size: 0.85rem;
 	font-style: italic;
-	color: rgb(150, 150, 150);
+	color: var(--mpd-text-muted);
 }
 
 /* Same 32px as the top bar's own .nav-logo it replaces, 4px clear of the
@@ -1889,12 +2243,13 @@ button.danger {
 .search-text,
 .search-attributes,
 .search-min-rating,
-.search-date-bound {
+.search-date-bound,
+.search-media-type {
 	display: flex;
 	flex-direction: column;
 	gap: 0.25rem;
 	font-size: 0.85rem;
-	color: rgb(220, 220, 220);
+	color: var(--mpd-text);
 	width: 100%;
 }
 
@@ -1923,13 +2278,13 @@ button.danger {
    value. */
 .search-criteria-separator {
 	border: none;
-	border-top: 1px solid rgb(90, 90, 90);
+	border-top: 1px solid var(--mpd-line);
 	width: 100%;
 	margin: 0;
 }
 
 .search-result-count {
-	color: rgb(150, 150, 150);
+	color: var(--mpd-text-muted);
 	font-size: 0.85rem;
 	margin: 0.5rem 0 0.5rem 1rem;
 	flex-shrink: 0;
@@ -1938,13 +2293,13 @@ button.danger {
 .filmstrip-sentinel {
 	height: 2rem;
 	text-align: center;
-	color: rgb(150, 150, 150);
+	color: var(--mpd-text-muted);
 	font-size: 0.85rem;
 }
 
 /* Import options (ImportSvr's autoSort/createSubDir checkboxes) */
 .uploader {
-	background: black;
+	background: var(--mpd-panel-bg);
 	border: 1px solid gray;
 	padding: 0.75rem 1rem;
 }
@@ -1983,7 +2338,7 @@ button.danger {
 	flex-wrap: wrap;
 	gap: 1.5rem;
 	margin-bottom: 0.75rem;
-	color: rgb(220, 220, 220);
+	color: var(--mpd-text);
 	font-size: 0.85rem;
 }
 
@@ -2773,4 +3128,128 @@ div.mobile-mosaic-thumb-img {
 .share-warning {
 	color: rgb(240, 200, 90);
 	margin: 0;
+}
+
+/* Rename / Move one picture (19/10/2026, ImageMoveForm) - inside the black
+   picture popup, below its action buttons. */
+.image-move-form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	margin-top: 1rem;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--mpd-line);
+}
+
+.image-move-form h4 {
+	margin: 0;
+}
+
+.image-move-name {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.image-move-name input {
+	flex: 1;
+}
+
+.image-move-target {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.image-move-tree .directory-tree {
+	max-height: 240px;
+	overflow-y: auto;
+}
+
+.image-move-warning {
+	margin: 0;
+	color: var(--mpd-text-muted);
+	font-size: 0.9em;
+}
+
+/* Share to myPhotoDiary (21/10/2026, MobileSharedFilesPage) - a strip of
+   the received files above the sequence name. */
+.mobile-shared-previews {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 0.75rem;
+}
+
+.mobile-shared-previews img,
+.mobile-shared-previews video {
+	width: 72px;
+	height: 72px;
+	object-fit: cover;
+	background: #222;
+}
+
+.mobile-shared-hint {
+	margin: 0 0 0.75rem;
+	font-size: 0.9em;
+	color: rgb(150, 150, 150);
+}
+
+/* One line per file that couldn't be published (MobileImportForm). */
+.mobile-import-error {
+	white-space: pre-line;
+}
+
+/* Share to myPhotoDiary - sort by date vs add to an existing sequence
+   (25/10/2026, MobileSharedFilesPage/MobileSequencePicker). */
+.mobile-page-content label.mobile-target-option {
+	flex-direction: row;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.mobile-sequence-picker {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	border: 1px solid #555;
+	border-radius: 4px;
+	padding: 0.5rem 0.75rem 0.75rem;
+}
+
+.mobile-sequence-picker h3 {
+	margin: 0.25rem 0 0;
+	font-size: 0.9rem;
+	color: rgb(150, 150, 150);
+}
+
+.mobile-picker-bar {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.mobile-picker-count,
+.mobile-picker-empty {
+	color: rgb(150, 150, 150);
+}
+
+.mobile-target-chosen {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	border: 1px solid #555;
+	border-radius: 4px;
+	padding: 0.5rem 0.75rem;
+	word-break: break-word;
+}
+
+/* The sequence-name field sits directly in .mobile-page-content (a column)
+   on the shared-files page, not inside a wrapping .import-option row:
+   undo the full-row flex-basis above, which in a column means full height. */
+.mobile-page-content > .sequence-name-input {
+	flex: none;
+	margin-top: 0;
 }

@@ -14,6 +14,7 @@
  * limitations under the License.
  ******************************************************************************/
 
+import { AppBanner } from './AppBanner';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext';
@@ -54,7 +55,7 @@ export function LoginForm() {
 			    login-specific element (corrected 03/09/2026: an earlier pass
 			    had put the banner inside `.login-form` itself instead). */}
 			<nav className="screen-nav">
-				<img className="nav-logo" src="/legacy/photodiary-banner-short.png" alt={t('common.appName')} />
+				<AppBanner className="nav-logo" />
 			</nav>
 			<div className="login-screen-body">
 				<form className="login-form" onSubmit={handleSubmit}>

@@ -87,6 +87,7 @@ public class ShareLinkPreviewController {
 	private final SharedSearchService sharedSearchService;
 	private final String configuredPublicBaseUrl;
 	private final AppSettingsService appSettingsService;
+	private final SequenceShareResolver sequenceShareResolver;
 
 	public ShareLinkPreviewController(
 			GalleryService galleryService,
@@ -95,7 +96,8 @@ public class ShareLinkPreviewController {
 			ShareTokenService tokenService,
 			SharedSearchService sharedSearchService,
 			@Value("${app.public-base-url:}") String configuredPublicBaseUrl,
-			AppSettingsService appSettingsService) {
+			AppSettingsService appSettingsService,
+			SequenceShareResolver sequenceShareResolver) {
 		this.galleryService = galleryService;
 		this.directoryRepository = directoryRepository;
 		this.imageRepository = imageRepository;
@@ -103,6 +105,7 @@ public class ShareLinkPreviewController {
 		this.sharedSearchService = sharedSearchService;
 		this.configuredPublicBaseUrl = configuredPublicBaseUrl;
 		this.appSettingsService = appSettingsService;
+		this.sequenceShareResolver = sequenceShareResolver;
 	}
 
 	@GetMapping(value = "/share/image/{imageId}", produces = MediaType.TEXT_HTML_VALUE)
@@ -112,7 +115,7 @@ public class ShareLinkPreviewController {
 		Image image = galleryService.requireImage(imageId);
 		boolean allowed = switch (claims.scope()) {
 			case IMAGE -> claims.id().equals(image.getId());
-			case SEQUENCE -> claims.id().equals(image.getDirectory().getId());
+			case SEQUENCE -> sequenceShareResolver.grants(claims.id(), image);
 			case SEARCH -> sharedSearchService.contains(claims.id(), image.getId());
 		};
 		if (!allowed) {
@@ -137,16 +140,16 @@ public class ShareLinkPreviewController {
 		if (claims.scope() != ShareScope.SEQUENCE || !claims.id().equals(directoryId)) {
 			throw new InvalidShareTokenException("Share token does not match the requested sequence");
 		}
-		Directory directory = directoryRepository.findById(directoryId).orElseThrow(() -> new DirectoryNotFoundException(directoryId));
+		SequenceShareResolver.SharedSequence shared = sequenceShareResolver.resolve(directoryId);
 		String base = publicBaseUrl(request);
 		String encodedToken = URLEncoder.encode(token, StandardCharsets.UTF_8);
-		String pageUrl = base + "/share/sequence/" + directory.getId() + "?token=" + encodedToken;
+		String pageUrl = base + "/share/sequence/" + shared.id() + "?token=" + encodedToken;
 		// The first image in the sequence (explicit ask - "present the first
 		// picture"), same ordering/video-exclusion as the sequence's own
 		// filmstrip (ShareController.publicSequence) - null (no og:image tag
 		// at all, generic icon) only for a sequence with no photos of its own
 		// yet, or one that's video-only.
-		List<Image> images = imageRepository.findByDirectory_IdOrderByNameAsc(directoryId);
+		List<Image> images = shared.images();
 		Optional<Image> firstImage = images.stream().filter(img -> img.getMediaType() != org.myphotodiary.cms.gallery.MediaType.VIDEO).findFirst();
 		String ogImageUrl = firstImage.map(img -> base + "/api/public/images/" + img.getId() + "/web?token=" + encodedToken).orElse(null);
 		return renderHtml(pageUrl, ogImageUrl);

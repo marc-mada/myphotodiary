@@ -69,6 +69,28 @@ class MeControllerTest {
 	}
 
 	@Test
+	void presentation_defaultsToDark_acceptsTheKnownOnes_andRejectsAnythingElse() {
+		userService.createUser(new CreateUserRequest("pres", "Pres P.", "pw", null, null));
+		assertThat(meController.me(authenticationFor("pres")).presentation()).isEqualTo("dark");
+		for (String id : java.util.List.of("bright", "titanium", "green-wilderness", "old-rose", "deep-blue", "lagoon", "dark")) {
+			assertThat(meController.update(authenticationFor("pres"), new UpdateMeRequest(null, null, null, null, null, id)).presentation()).isEqualTo(id);
+		}
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> meController.update(authenticationFor("pres"), new UpdateMeRequest(null, null, null, null, null, "neon")))
+				.isInstanceOf(IllegalArgumentException.class);
+		assertThat(meController.me(authenticationFor("pres")).presentation()).isEqualTo("dark");
+	}
+
+	@Test
+	void onlineCapture_defaultsToOff_andCanBeTurnedOnAndOff() {
+		userService.createUser(new CreateUserRequest("capt", "Capt C.", "pw", null, null));
+		assertThat(meController.me(authenticationFor("capt")).onlineCapture()).isFalse();
+		assertThat(meController.update(authenticationFor("capt"), new UpdateMeRequest(null, null, null, null, null, null, true)).onlineCapture()).isTrue();
+		// Absent from the request: left as is.
+		assertThat(meController.update(authenticationFor("capt"), new UpdateMeRequest(null, 7, null, null, null)).onlineCapture()).isTrue();
+		assertThat(meController.update(authenticationFor("capt"), new UpdateMeRequest(null, null, null, null, null, null, false)).onlineCapture()).isFalse();
+	}
+
+	@Test
 	void update_setsAllPreferences() {
 		userService.createUser(new CreateUserRequest("erin", "Erin E.", "pw", null, null));
 

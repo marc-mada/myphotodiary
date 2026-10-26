@@ -32,6 +32,7 @@ import java.nio.file.Path;
 
 import javax.imageio.ImageIO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.apache.commons.imaging.formats.jpeg.exif.ExifRewriter;
@@ -903,6 +904,27 @@ class GalleryServiceTest {
 	}
 
 	@Test
+	void search_mediaType_isAHardFilter_andCountsAsACriterionOnItsOwn() throws IOException {
+		// 15/10/2026, explicit ask: "video" as a search criterion - ANDed with
+		// the rest (unlike tags, which are ORed with the text).
+		indexerService.updateDirectoryDetail(auth, directoryId, new UpdateDirectoryDetailRequest("okapi holiday", null, null, null, null));
+		ImageResponse photo = galleryService.uploadImage(auth, directoryId, jpegFile("photo.jpg"));
+		Image video = imageRepository.save(new Image("clip.mp4", directoryRepository.findById(directoryId).orElseThrow(), LocalDateTime.now(), MediaType.VIDEO));
+
+		assertThat(galleryService.search(auth, null, null, null, null, "okapi", MediaType.VIDEO, 0, 10).images())
+				.extracting(ImageResponse::id).containsExactly(video.getId());
+		assertThat(galleryService.search(auth, null, null, null, null, "okapi", MediaType.IMAGE, 0, 10).images())
+				.extracting(ImageResponse::id).containsExactly(photo.id());
+		assertThat(galleryService.search(auth, null, null, null, null, "okapi", null, 0, 10).images())
+				.extracting(ImageResponse::id).containsExactlyInAnyOrder(photo.id(), video.getId());
+		// Alone, it's a real search: every video, none of the photos.
+		assertThat(GalleryService.hasSearchCriteria(null, null, null, null, null, MediaType.VIDEO)).isTrue();
+		assertThat(galleryService.search(auth, null, null, null, null, null, MediaType.VIDEO, 0, 1000).images())
+				.extracting(ImageResponse::id).contains(video.getId()).doesNotContain(photo.id());
+		assertThatThrownBy(() -> GalleryController.parseMediaType("audio")).isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@Test
 	void search_textShorterThanFourCharacters_isIgnoredEntirely() throws IOException {
 		// Explicit ask, same-day follow-up: "only use the textfield match
 		// when user has entered 4 characters or more". Proven with a
@@ -996,6 +1018,29 @@ class GalleryServiceTest {
 	// more)") - previously never checked at all; see
 	// GalleryAuthorizationService's own doc for the full reasoning and why
 	// directory-tree *navigation* itself stays unrestricted. ---
+
+	@Test
+	void listImages_sortsByCaptureDateThenName_notByNameAlone() throws IOException {
+		// Real case (26/10/2026): phone files named "20261022_..." listed
+		// before an Olympus "PC25..." sequence taken months earlier.
+		ImageResponse phone = galleryService.uploadImage(auth, directoryId, jpegFile("20261022_101433.jpg"));
+		ImageResponse camera = galleryService.uploadImage(auth, directoryId, jpegFile("PC253561.jpeg"));
+		ImageResponse sameTime = galleryService.uploadImage(auth, directoryId, jpegFile("PC253560.jpeg"));
+		ImageResponse undated = galleryService.uploadImage(auth, directoryId, jpegFile("AAA.jpg"));
+		setCaptureDate(phone.id(), LocalDateTime.of(2026, 10, 22, 10, 14));
+		setCaptureDate(camera.id(), LocalDateTime.of(2025, 12, 25, 12, 0));
+		setCaptureDate(sameTime.id(), LocalDateTime.of(2025, 12, 25, 12, 0));
+		setCaptureDate(undated.id(), null);
+
+		assertThat(galleryService.listImages(auth, directoryId)).extracting(ImageResponse::name)
+				.containsExactly("PC253560.jpeg", "PC253561.jpeg", "20261022_101433.jpg", "AAA.jpg");
+	}
+
+	private void setCaptureDate(Long imageId, LocalDateTime date) {
+		Image image = imageRepository.findById(imageId).orElseThrow();
+		image.setCaptureDate(date);
+		imageRepository.saveAndFlush(image);
+	}
 
 	@Test
 	void listImages_deniedForUserWithNoRoleAssignmentInThatGroup() {

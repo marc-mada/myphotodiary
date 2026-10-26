@@ -14,9 +14,11 @@
  * limitations under the License.
  ******************************************************************************/
 
+import { AppBanner } from './components/AppBanner';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { meApi } from './api/navigation';
+import { applyPresentation } from './presentation';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { LanguageSwitcher } from './components/LanguageSwitcher';
 import { LoginForm } from './components/LoginForm';
@@ -138,7 +140,11 @@ function AppContent() {
 		if (IS_MOBILE || !isAuthenticated) return;
 		meApi
 			.get()
-			.then((me) => setPrimaryRoleName(me.primaryRoleName))
+			.then((me) => {
+				setPrimaryRoleName(me.primaryRoleName);
+				// The signed-in user's own desktop presentation (18/10/2026).
+				applyPresentation(me.presentation);
+			})
 			.catch(() => setPrimaryRoleName(null));
 	}, [isAuthenticated]);
 
@@ -211,7 +217,7 @@ function AppContent() {
 			    .screen-footer in app.css. */}
 			<footer className="screen-footer">
 				<span className="footer-label">{t('common.poweredBy')}</span>
-				<img className="footer-logo" src="/legacy/photodiary-banner-short.png" alt={t('common.appName')} />
+				<AppBanner className="footer-logo" />
 			</footer>
 		</div>
 	);

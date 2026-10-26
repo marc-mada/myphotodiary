@@ -85,6 +85,7 @@ public class ShareController {
 	private final ShareTokenService tokenService;
 	private final SharedSearchService sharedSearchService;
 	private final AppSettingsService appSettingsService;
+	private final SequenceShareResolver sequenceShareResolver;
 
 	public ShareController(
 			GalleryService galleryService,
@@ -93,7 +94,8 @@ public class ShareController {
 			ImageStorageService storageService,
 			ShareTokenService tokenService,
 			SharedSearchService sharedSearchService,
-			AppSettingsService appSettingsService) {
+			AppSettingsService appSettingsService,
+			SequenceShareResolver sequenceShareResolver) {
 		this.galleryService = galleryService;
 		this.directoryRepository = directoryRepository;
 		this.imageRepository = imageRepository;
@@ -101,6 +103,7 @@ public class ShareController {
 		this.tokenService = tokenService;
 		this.sharedSearchService = sharedSearchService;
 		this.appSettingsService = appSettingsService;
+		this.sequenceShareResolver = sequenceShareResolver;
 	}
 
 	/**
@@ -181,13 +184,15 @@ public class ShareController {
 		if (claims.scope() != ShareScope.SEQUENCE || !claims.id().equals(directoryId)) {
 			throw new InvalidShareTokenException("Share token does not match the requested sequence");
 		}
-		Directory directory = directoryRepository.findById(directoryId).orElseThrow(() -> new DirectoryNotFoundException(directoryId));
+		// The live sequence, or - merged into another since (17/10/2026) - only
+		// the pictures that came from it (SequenceShareResolver).
+		SequenceShareResolver.SharedSequence shared = sequenceShareResolver.resolve(directoryId);
 		boolean videos = appSettingsService.isVideoSharingAllowed();
-		List<PublicImageResponse> images = imageRepository.findByDirectory_IdOrderByNameAsc(directoryId).stream()
+		List<PublicImageResponse> images = shared.images().stream()
 				.filter(img -> videos || img.getMediaType() != org.myphotodiary.cms.gallery.MediaType.VIDEO) // see class javadoc
 				.map(img -> PublicImageResponse.from(img, token))
 				.toList();
-		return new PublicSequenceResponse(directory.getId(), directory.getDescription(), images);
+		return new PublicSequenceResponse(shared.id(), shared.description(), images);
 	}
 
 	/**
@@ -206,7 +211,7 @@ public class ShareController {
 		Image image = galleryService.requireImage(imageId);
 		boolean allowed = switch (claims.scope()) {
 			case IMAGE -> claims.id().equals(image.getId());
-			case SEQUENCE -> claims.id().equals(image.getDirectory().getId());
+			case SEQUENCE -> sequenceShareResolver.grants(claims.id(), image);
 			case SEARCH -> sharedSearchService.contains(claims.id(), image.getId());
 		};
 		if (!allowed) {

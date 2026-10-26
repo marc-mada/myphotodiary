@@ -70,16 +70,21 @@ export function MobileMenuPanel({ onClose, onHome, onGo, onSearch, onCamera, onF
 					<MobileIcon name="search" /> {t('mobile.search')}
 				</button>
 			</li>
-			<li>
-				<button type="button" onClick={item(onCamera)}>
-					<MobileIcon name="camera" /> {t('mobile.camera')}
-				</button>
-			</li>
-			<li>
-				<button type="button" onClick={item(onFilm)}>
-					<MobileIcon name="video" /> {t('mobile.film')}
-				</button>
-			</li>
+			{/* Camera/Film only with the "Online capture" user setting on (26/10/2026) - MobileApp passes null otherwise. */}
+			{onCamera && (
+				<li>
+					<button type="button" onClick={item(onCamera)}>
+						<MobileIcon name="camera" /> {t('mobile.camera')}
+					</button>
+				</li>
+			)}
+			{onFilm && (
+				<li>
+					<button type="button" onClick={item(onFilm)}>
+						<MobileIcon name="video" /> {t('mobile.film')}
+					</button>
+				</li>
+			)}
 			<li>
 				<button type="button" onClick={item(onPublish)}>
 					<MobileIcon name="action" /> {t('mobile.publish')}

@@ -89,6 +89,10 @@ export const galleryApi = {
 
 	removeImage: (imageId) => apiFetch(`/api/images/${imageId}`, { method: 'DELETE' }),
 
+	// Rename and/or move one picture or video (19/10/2026) - { newName, targetPath },
+	// either null to keep it. Answers the updated picture.
+	moveImage: (imageId, request) => apiFetch(`/api/images/${imageId}/move`, { method: 'POST', body: request }),
+
 	// 90-degree clockwise rotation (02/09/2026) - no request body, no
 	// response body (GalleryController.rotateImage's own doc: nothing
 	// persisted changes for the caller to see back) - the caller

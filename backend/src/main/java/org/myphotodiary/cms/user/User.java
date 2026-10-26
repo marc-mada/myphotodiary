@@ -75,6 +75,14 @@ public class User {
 	@Column(name = "postit_fade_delay", nullable = false)
 	private int postItFadeDelay = 8;
 
+	/** Desktop presentation (V17, 18/10/2026) - see UserSettingsUpdater.PRESENTATIONS. */
+	@Column(nullable = false)
+	private String presentation = "dark";
+
+	/** Mobile Camera/Film menu entries shown (V18, 26/10/2026) - hidden by default. */
+	@Column(name = "online_capture", nullable = false)
+	private boolean onlineCapture = false;
+
 	@OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<RoleAssignment> roleAssignments = new ArrayList<>();
 
@@ -150,6 +158,22 @@ public class User {
 
 	public void setPostItFadeDelay(int postItFadeDelay) {
 		this.postItFadeDelay = postItFadeDelay;
+	}
+
+	public String getPresentation() {
+		return presentation;
+	}
+
+	public void setPresentation(String presentation) {
+		this.presentation = presentation;
+	}
+
+	public boolean isOnlineCapture() {
+		return onlineCapture;
+	}
+
+	public void setOnlineCapture(boolean onlineCapture) {
+		this.onlineCapture = onlineCapture;
 	}
 
 	public List<RoleAssignment> getRoleAssignments() {

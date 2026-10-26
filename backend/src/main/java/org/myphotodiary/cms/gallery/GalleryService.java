@@ -125,7 +125,7 @@ public class GalleryService {
 	public List<ImageResponse> listImages(Authentication authentication, Long directoryId) {
 		Directory directory = requireDirectory(directoryId);
 		authorizationService.checkAuthorization(authentication, directory.getGroup(), Action.BROWSE);
-		return imageRepository.findByDirectory_IdOrderByNameAsc(directoryId).stream().map(ImageResponse::from).toList();
+		return imageRepository.findSequenceInDisplayOrder(directoryId).stream().map(ImageResponse::from).toList();
 	}
 
 	@Transactional
@@ -274,7 +274,14 @@ public class GalleryService {
 	@Transactional(readOnly = true)
 	public ImageSearchResponse search(Authentication authentication, List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate,
 			String text, int page, int pageSize) {
-		List<Image> filtered = searchMatches(authentication, attributeNames, minRating, fromDate, toDate, text);
+		return search(authentication, attributeNames, minRating, fromDate, toDate, text, null, page, pageSize);
+	}
+
+	/** {@code mediaType} (15/10/2026): only photos or only videos; {@code null} for both - see {@link #searchMatches}. */
+	@Transactional(readOnly = true)
+	public ImageSearchResponse search(Authentication authentication, List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate,
+			String text, MediaType mediaType, int page, int pageSize) {
+		List<Image> filtered = searchMatches(authentication, attributeNames, minRating, fromDate, toDate, text, mediaType);
 		int from = Math.min(page * pageSize, filtered.size());
 		int to = Math.min(from + pageSize, filtered.size());
 		List<ImageResponse> pageItems = filtered.subList(from, to).stream().map(ImageResponse::from).toList();
@@ -288,9 +295,14 @@ public class GalleryService {
 	 * tag, a minimum rating, a date bound, or a free text of 4+ characters.
 	 */
 	public static boolean hasSearchCriteria(List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate, String text) {
+		return hasSearchCriteria(attributeNames, minRating, fromDate, toDate, text, null);
+	}
+
+	/** A media type alone ("videos only") counts as a criterion too (15/10/2026). */
+	public static boolean hasSearchCriteria(List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate, String text, MediaType mediaType) {
 		boolean hasTags = attributeNames != null && !attributeNames.isEmpty();
 		boolean hasText = text != null && text.trim().length() >= MIN_TEXT_SEARCH_LENGTH;
-		return hasTags || hasText || minRating != null || fromDate != null || toDate != null;
+		return hasTags || hasText || minRating != null || fromDate != null || toDate != null || mediaType != null;
 	}
 
 	/**
@@ -302,6 +314,19 @@ public class GalleryService {
 	@Transactional(readOnly = true)
 	public List<Image> searchMatches(Authentication authentication, List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate,
 			String text) {
+		return searchMatches(authentication, attributeNames, minRating, fromDate, toDate, text, null);
+	}
+
+	/**
+	 * {@code mediaType} (15/10/2026, explicit ask - "videos" as a search
+	 * criterion): a hard filter ANDed like the rating and dates, so "videos +
+	 * Camargue" means Camargue videos only. Read from the existing
+	 * {@code image.media_type} column (V9), not a tag: tags are ORed with the
+	 * text, user-editable, and would have to be kept in sync on every upload.
+	 */
+	@Transactional(readOnly = true)
+	public List<Image> searchMatches(Authentication authentication, List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate,
+			String text, MediaType mediaType) {
 		Set<String> readableGroups = authorizationService.readableGroupNames(authentication);
 		boolean hasTags = attributeNames != null && !attributeNames.isEmpty();
 		Set<Image> tagMatchedImages = null;
@@ -327,6 +352,7 @@ public class GalleryService {
 		// BETWEEN clause on a null column.
 		List<Image> filtered = imageRepository.findAll().stream()
 				.filter(img -> readableGroups == null || readableGroups.contains(img.getDirectory().getGroup().getGroupName()))
+				.filter(img -> mediaType == null || img.getMediaType() == mediaType)
 				.filter(img -> minRating == null || img.getRating() >= minRating)
 				.filter(img -> fromDate == null || (img.getCaptureDate() != null && !img.getCaptureDate().toLocalDate().isBefore(fromDate)))
 				.filter(img -> toDate == null || (img.getCaptureDate() != null && !img.getCaptureDate().toLocalDate().isAfter(toDate)))

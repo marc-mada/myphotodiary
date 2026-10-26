@@ -76,6 +76,46 @@ see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Release Notes
 
+### Unreleased
+
+- Mobile: the menu's **Camera** and **Film** entries are now hidden by
+  default; a new per-user setting, **Online capture** (Admin → Configure),
+  shows them again.
+- Mobile (Android): **share pictures and videos to myPhotoDiary** from
+  another app (WhatsApp, the gallery…) once the app is installed on the
+  home screen. Each file is published to the year/month of its own date,
+  into the sequence you name. Not possible on iPhone/iPad.
+- Mobile: myPhotoDiary can now really be installed on Android (larger app
+  icons). Before, the browser could only add a home-screen shortcut.
+- Mobile: when some files of an upload are refused (an HEVC video, a name
+  already used...), the others are still published; only the refused ones
+  stay selected, each with its reason.
+- Desktop: **Rename / Move** a picture or video from its description
+  popup — new file name, another sequence, or both. Comment, rating, tags
+  and existing picture links follow it; a name already used in the
+  target sequence is refused.
+- Desktop: the picture count in the directory tree now updates right
+  after a picture is deleted.
+- Desktop: choose a **presentation** in User settings — Dark Gallery (the
+  original look, default), Bright Gallery, Titanium Gallery, Green
+  Wilderness Gallery, Old Rose Gallery, Deep Blue Gallery or Lagoon
+  Gallery. Applied at once, kept on your account; the mobile screens keep
+  their own look.
+- Images adjusted for light presentations: the rating stars have a
+  transparent background, the empty-folder world map is much lighter, and
+  Bright/Titanium/Old Rose/Lagoon show the banner with dark lettering.
+- Desktop: buttons and tabs now have a slight relief (a gradient in the
+  button's colour, pushed-in look when pressed), in every presentation.
+- Search (desktop and mobile): new **Type** filter — all, photos only or
+  videos only. Combined with the other filters (videos + "Camargue" gives
+  the Camargue videos); "Videos" alone lists every video.
+- Indexing (Admin → Index management, Batch Publish, browsing a new
+  folder) now also picks up H.264 videos copied straight onto the server's
+  disk, and the folder tree counts videos (a folder of videos no longer
+  shows 0).
+- Share links of a sequence keep working after it is merged into another
+  one, still showing only that sequence's own pictures.
+
 ### 2.11.0 — 2026-10-14
 
 Upgrade note: if you re-indexed sequences containing videos with an

@@ -65,6 +65,8 @@ export function MobileSearchPage({ allAttributes, onSearch, onHome, onLogout }) 
 	const [minRating, setMinRating] = useState('');
 	const [fromDate, setFromDate] = useState('');
 	const [toDate, setToDate] = useState('');
+	// Photos or videos only (15/10/2026) - '' for both, else 'IMAGE'/'VIDEO'.
+	const [mediaType, setMediaType] = useState('');
 	const [error, setError] = useState(null);
 	const reportError = useForbiddenAwareError(setError);
 	const [searching, setSearching] = useState(false);
@@ -106,6 +108,7 @@ export function MobileSearchPage({ allAttributes, onSearch, onHome, onLogout }) 
 			minRating: minRating === '' ? null : Number(minRating),
 			fromDate: fromDate || null,
 			toDate: toDate || null,
+			mediaType: mediaType || null,
 			// Below the minimum, not a criterion at all (explicit ask,
 			// 10/09/2026) - same threshold desktop's own debounce applies,
 			// now enforced here too rather than left for the backend to
@@ -156,6 +159,14 @@ export function MobileSearchPage({ allAttributes, onSearch, onHome, onLogout }) 
 			<label>
 				{t('mobile.minimumRating')}
 				<StarRating rating={minRating === '' ? -1 : Number(minRating)} onChange={handleMinRatingClick} />
+			</label>
+			<label>
+				{t('search.mediaType')}
+				<select value={mediaType} onChange={(e) => setMediaType(e.target.value)}>
+					<option value="">{t('search.mediaTypeAll')}</option>
+					<option value="IMAGE">{t('search.mediaTypeImage')}</option>
+					<option value="VIDEO">{t('search.mediaTypeVideo')}</option>
+				</select>
 			</label>
 			<fieldset className="mobile-attribute-checklist">
 				<legend>{t('mobile.attributesLegend')}</legend>

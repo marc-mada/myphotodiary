@@ -32,6 +32,17 @@ final class UserSettingsUpdater {
 	private UserSettingsUpdater() {
 	}
 
+	/**
+	 * The desktop presentations a user can pick (18/10/2026, explicit ask):
+	 * "Dark Gallery" (the original look, default), "Bright Gallery",
+	 * "Titanium Gallery", "Green Wilderness Gallery", "Old Rose Gallery",
+	 * "Deep Blue Gallery", "Lagoon Gallery". The look itself lives
+	 * in the frontend (app.css, `html[data-presentation=...]`); this list
+	 * only keeps a typo or a removed id out of the database.
+	 */
+	static final java.util.Set<String> PRESENTATIONS = java.util.Set.of("dark", "bright", "titanium", "green-wilderness",
+			"old-rose", "deep-blue", "lagoon");
+
 	static void apply(User user, UpdateMeRequest request) {
 		if (request.maxQueryLength() != null) {
 			if (request.maxQueryLength() < 1) {
@@ -69,6 +80,15 @@ final class UserSettingsUpdater {
 				throw new IllegalArgumentException("postItFadeDelay must be between 2 and 60");
 			}
 			user.setPostItFadeDelay(request.postItFadeDelay());
+		}
+		if (request.presentation() != null) {
+			if (!PRESENTATIONS.contains(request.presentation())) {
+				throw new IllegalArgumentException("presentation must be one of " + new java.util.TreeSet<>(PRESENTATIONS) + ", got " + request.presentation());
+			}
+			user.setPresentation(request.presentation());
+		}
+		if (request.onlineCapture() != null) {
+			user.setOnlineCapture(request.onlineCapture());
 		}
 	}
 }

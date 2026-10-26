@@ -16,6 +16,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ImageMoveForm } from './ImageMoveForm';
 import { StarRating } from './StarRating';
 import { useForbiddenAwareError } from '../temporaryMessage';
 
@@ -54,18 +55,23 @@ import { useForbiddenAwareError } from '../temporaryMessage';
  * upload instant when EXIF has none, but older/edge-case rows could still
  * lack one). Formatted with the viewer's own i18next language, not a fixed
  * locale, so it reads naturally in either UI language.
+ *
+ * `onMove` (19/10/2026): when given, adds the Rename / Move action
+ * (ImageMoveForm).
  */
-export function ImageEditForm({ image, onUpdate, allAttributes }) {
+export function ImageEditForm({ image, onUpdate, allAttributes, onMove }) {
 	const { t, i18n } = useTranslation();
 	const [description, setDescription] = useState(image.description ?? '');
 	const [downloading, setDownloading] = useState(false);
 	const [error, setError] = useState(null);
 	const reportError = useForbiddenAwareError(setError);
 	const [newTagName, setNewTagName] = useState('');
+	const [moveOpen, setMoveOpen] = useState(false);
 
 	useEffect(() => {
 		setDescription(image.description ?? '');
 		setNewTagName('');
+		setMoveOpen(false);
 	}, [image.id]);
 
 	function saveDescription() {
@@ -156,7 +162,13 @@ export function ImageEditForm({ image, onUpdate, allAttributes }) {
 				<button type="button" onClick={handleDownload} disabled={downloading}>
 					{downloading ? t('imageEdit.downloading') : t('imageEdit.download')}
 				</button>
+				{onMove && !moveOpen && (
+					<button type="button" onClick={() => setMoveOpen(true)}>
+						{t('imageMove.open')}
+					</button>
+				)}
 			</div>
+			{onMove && moveOpen && <ImageMoveForm image={image} onMove={onMove} onCancel={() => setMoveOpen(false)} />}
 		</>
 	);
 }

@@ -19,16 +19,20 @@ package org.myphotodiary.cms.gallery;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.myphotodiary.cms.gallery.dto.BatchIndexResult;
 import org.myphotodiary.cms.gallery.dto.DirectoryResponse;
 import org.myphotodiary.cms.gallery.dto.DirectoryTreeNode;
+import org.myphotodiary.cms.gallery.dto.ImageResponse;
+import org.myphotodiary.cms.gallery.dto.MoveImageRequest;
 import org.myphotodiary.cms.gallery.dto.RenameDirectoryRequest;
 import org.myphotodiary.cms.gallery.dto.UpdateDirectoryDetailRequest;
 import org.myphotodiary.cms.user.Action;
@@ -37,6 +41,8 @@ import org.myphotodiary.cms.user.GroupRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Filesystem-driven directory tree, indexing, rename, and metadata - the
@@ -69,10 +75,16 @@ public class DirectoryIndexerService {
 	private final ExifDateReader exifDateReader;
 	private final ExifGpsReader exifGpsReader;
 	private final GalleryAuthorizationService authorizationService;
+	private final VideoFormatValidator videoFormatValidator;
+	private final MergedSequenceRepository mergedSequenceRepository;
+	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DirectoryIndexerService.class);
 
 	public DirectoryIndexerService(DirectoryRepository directoryRepository, ImageRepository imageRepository,
 			AttributeRepository attributeRepository, GroupRepository groupRepository, ImageStorageService storageService,
-			ExifDateReader exifDateReader, ExifGpsReader exifGpsReader, GalleryAuthorizationService authorizationService) {
+			ExifDateReader exifDateReader, ExifGpsReader exifGpsReader, GalleryAuthorizationService authorizationService,
+			VideoFormatValidator videoFormatValidator, MergedSequenceRepository mergedSequenceRepository) {
+		this.videoFormatValidator = videoFormatValidator;
+		this.mergedSequenceRepository = mergedSequenceRepository;
 		this.directoryRepository = directoryRepository;
 		this.imageRepository = imageRepository;
 		this.attributeRepository = attributeRepository;
@@ -86,13 +98,36 @@ public class DirectoryIndexerService {
 	@Transactional(readOnly = true)
 	public List<DirectoryTreeNode> listSubdirectories(String path) {
 		String normalized = normalize(path);
-		return storageService.listSubdirectoryNames(normalized).stream()
+		List<String> names = storageService.listSubdirectoryNames(normalized);
+		if (YEAR_MONTH.matcher(normalized).matches()) names = sortByEarliestPicture(normalized, names);
+		return names.stream()
 				.map(name -> {
 					String childPath = normalized.isEmpty() ? name : normalized + "/" + name;
-					int imageCount = storageService.listImageFileNames(childPath).size();
+					// Pictures and videos (17/10/2026) - a video-only folder used to show 0.
+					int imageCount = storageService.listMediaFileNames(childPath).size();
 					boolean indexed = directoryRepository.findByPath(childPath).map(Directory::isIndexingAllowed).orElse(false);
 					return new DirectoryTreeNode(name, childPath, imageCount, indexed);
 				})
+				.toList();
+	}
+
+	private static final Pattern YEAR_MONTH = Pattern.compile("\\d{4}/\\d{1,2}");
+
+	/**
+	 * The sequences of a month, in the order they were taken (26/10/2026): by
+	 * the date of their earliest picture, then by name. A folder with no
+	 * indexed, dated picture yet (just dropped on disk) goes last, by name.
+	 * Other levels (years, months, sub-sequences) stay sorted by name.
+	 */
+	private List<String> sortByEarliestPicture(String monthPath, List<String> names) {
+		if (names.size() < 2) return names;
+		Map<String, LocalDateTime> earliest = new HashMap<>();
+		for (Object[] row : imageRepository.findEarliestCaptureDates(names.stream().map(n -> monthPath + "/" + n).toList())) {
+			earliest.put((String) row[0], (LocalDateTime) row[1]);
+		}
+		return names.stream()
+				.sorted(Comparator.comparing((String n) -> earliest.get(monthPath + "/" + n), Comparator.nullsLast(Comparator.naturalOrder()))
+						.thenComparing(Comparator.naturalOrder()))
 				.toList();
 	}
 
@@ -162,7 +197,7 @@ public class DirectoryIndexerService {
 	public BatchIndexResult indexRecursively(Authentication authentication, String rootPath) {
 		String normalized = normalize(rootPath);
 		List<String> targets = new ArrayList<>();
-		if (!storageService.listImageFileNames(normalized).isEmpty()) {
+		if (!storageService.listMediaFileNames(normalized).isEmpty()) {
 			targets.add(normalized);
 		}
 		for (DirectoryTreeNode node : listAllSubdirectoriesRecursive(normalized)) {
@@ -191,12 +226,20 @@ public class DirectoryIndexerService {
 	@Transactional
 	public DirectoryResponse indexDirectory(String path, String groupName) {
 		String normalized = normalize(path);
-		List<String> onDisk = storageService.listImageFileNames(normalized);
-		if (onDisk.isEmpty()) {
+		// Videos too (17/10/2026): a video dropped on disk is indexed like a
+		// picture (see the loop below), and an uploaded video is no longer
+		// mistaken for a file that disappeared.
+		List<String> onDisk = storageService.listMediaFileNames(normalized);
+		Optional<Directory> existing = directoryRepository.findByPath(normalized);
+		// An already indexed folder whose pictures were all moved away (for
+		// instance into a sub-sequence) is still synced, so its stale rows
+		// are removed (26/10/2026). Refused when the folder itself is gone
+		// (storage not mounted): that must never empty the index.
+		if (onDisk.isEmpty() && (existing.isEmpty() || !storageService.directoryExists(normalized))) {
 			throw new IllegalStateException("Directory has no images to index: " + normalized);
 		}
 
-		Directory directory = directoryRepository.findByPath(normalized)
+		Directory directory = existing
 				.orElseGet(() -> directoryRepository.save(new Directory(normalized, findOrCreateGroup(groupName), LocalDate.now())));
 		if (!directory.isIndexingAllowed()) {
 			throw new IllegalStateException("Indexing disabled for directory: " + normalized);
@@ -217,6 +260,13 @@ public class DirectoryIndexerService {
 		LocalDate latestImageDate = null;
 		for (String name : onDisk) {
 			var filePath = storageService.resolveOriginal(normalized, name);
+			if (ImageStorageService.hasVideoExtension(name)) {
+				LocalDate videoDay = indexVideo(directory, normalized, name, indexedByName.get(name), sequenceDefault);
+				if (videoDay != null) {
+					latestImageDate = (latestImageDate == null || videoDay.isAfter(latestImageDate)) ? videoDay : latestImageDate;
+				}
+				continue;
+			}
 			LocalDateTime captureDate = exifDateReader.readCaptureDate(filePath, name, sequenceDefault);
 			// null when the file carries no GPS tag at all - Coordinates is a
 			// record, not two loose doubles, precisely so "no GPS" is a single
@@ -273,6 +323,38 @@ public class DirectoryIndexerService {
 		directory.setSequenceDate(DirectoryDateRules.updateDirDate(directory.getSequenceDate(), latestImageDate));
 
 		return DirectoryResponse.from(directory);
+	}
+
+	/**
+	 * A video file met while indexing (17/10/2026). A new one (dropped on
+	 * disk) gets a row only if it passes the same H.264/AAC check as an
+	 * upload (VideoFormatValidator) - a browser couldn't play anything else;
+	 * it is skipped (logged) otherwise. The size limit isn't applied: it
+	 * guards uploads, and this file is already on the server. An existing
+	 * row keeps its date (an upload may have dated it from the browser, which
+	 * the file itself can't tell again). Its thumbnail is created if missing.
+	 * Returns the video's day, for the sequence date, or null if skipped.
+	 */
+	private LocalDate indexVideo(Directory directory, String directoryPath, String name, Image existing, LocalDateTime sequenceDefault) {
+		Image video = existing;
+		if (video == null) {
+			var file = storageService.resolveOriginal(directoryPath, name);
+			try {
+				videoFormatValidator.validate(file);
+			} catch (RuntimeException e) {
+				log.warn("Not indexing video {}/{}: {}", directoryPath, name, e.getMessage());
+				return null;
+			}
+			video = imageRepository.save(new Image(name, directory, exifDateReader.readCaptureDate(file, name, sequenceDefault), MediaType.VIDEO));
+		}
+		if (!storageService.videoThumbnailExists(directoryPath, name)) {
+			try {
+				storageService.generateVideoThumbnail(directoryPath, name);
+			} catch (RuntimeException e) {
+				log.warn("No thumbnail for video {}/{}: {}", directoryPath, name, e.getMessage());
+			}
+		}
+		return video.getCaptureDate() != null ? video.getCaptureDate().toLocalDate() : null;
 	}
 
 	/** DB index only - matches the legacy "reset index" admin command (DirIndexSvr/Configuration.resetIndexCmd). Files on disk are untouched. */
@@ -426,14 +508,16 @@ public class DirectoryIndexerService {
 			throw new IllegalArgumentException("Cannot merge: both sequences contain a sub-sequence named " + String.join(", ", sharedSubSequences));
 		}
 
-		Directory target = existingTarget.orElseGet(() -> storageService.listImageFileNames(targetPath).isEmpty()
+		Directory target = existingTarget.orElseGet(() -> storageService.listMediaFileNames(targetPath).isEmpty()
 				? directoryRepository.save(new Directory(targetPath, source.getGroup(), LocalDate.now()))
 				: requireDirectory(indexDirectory(targetPath, source.getGroup().getGroupName()).id()));
 		authorizationService.checkAuthorization(authentication, target.getGroup(), Action.EDIT_SEQUENCE);
 
 		// Pictures with a row: files and row move together.
 		Set<String> movedFileNames = new java.util.HashSet<>();
+		Set<Long> movedImageIds = new java.util.HashSet<>();
 		for (Image image : imageRepository.findByDirectory_IdOrderByNameAsc(source.getId())) {
+			movedImageIds.add(image.getId());
 			String newName = freeName(target, targetPath, image.getName());
 			storageService.moveImageFiles(sourcePath, image.getName(), targetPath, newName, image.getMediaType());
 			movedFileNames.add(image.getName());
@@ -454,11 +538,174 @@ public class DirectoryIndexerService {
 			descendant.setPath(targetPath + descendant.getPath().substring(sourcePath.length()));
 		}
 
+		// Links shared for the source keep working (17/10/2026, explicit ask),
+		// showing only the pictures that came from it (SequenceShareResolver).
+		// Sequences merged into the source earlier now follow it to the target.
+		for (MergedSequence earlier : mergedSequenceRepository.findByTargetDirectoryId(source.getId())) {
+			earlier.setTargetDirectoryId(target.getId());
+		}
+		mergedSequenceRepository.save(new MergedSequence(source.getId(), target.getId(), source.getDescription(), movedImageIds));
+
 		mergeDetails(source, target);
 		directoryRepository.delete(source);
 		directoryRepository.flush();
 		storageService.deleteMergedDirectory(sourcePath);
 		return target;
+	}
+
+	/**
+	 * Renames and/or moves one picture or video (19/10/2026, explicit ask).
+	 * The row keeps its id, so its comment, rating, tags, GPS and capture
+	 * date follow it, and picture share links / shared search results keep
+	 * working. What it inherited from its sequence (comment, tags) changes
+	 * with the sequence.
+	 *
+	 * <ul>
+	 * <li>Name: one file name, same extension (the photo/video type is read
+	 * from it). A name already used in the target - by a picture or any file
+	 * on disk - is refused (409, explicit choice: no automatic suffix).</li>
+	 * <li>Target: an existing folder; one never indexed is indexed first, as
+	 * for a sequence merge. Creating a new sequence is not done here.</li>
+	 * <li>Rights: EDIT_IMAGE on the picture's group, plus EDIT_SEQUENCE on the
+	 * target's group when the sequence changes.</li>
+	 * </ul>
+	 *
+	 * The files move first; if the database update then fails, they are moved
+	 * back (afterCompletion), so disk and database never disagree.
+	 */
+	@Transactional
+	public ImageResponse moveImage(Authentication authentication, Long imageId, MoveImageRequest request) {
+		Image image = imageRepository.findById(imageId).orElseThrow(() -> new ImageNotFoundException(imageId));
+		Directory source = image.getDirectory();
+		authorizationService.checkAuthorization(authentication, source.getGroup(), Action.EDIT_IMAGE);
+
+		String oldName = image.getName();
+		String newName = request.newName() == null || request.newName().isBlank() ? oldName : request.newName().trim();
+		requireValidFileName(newName, oldName);
+		String sourcePath = source.getPath();
+		String targetPath = request.targetPath() == null ? sourcePath : normalizeTargetPath(request.targetPath());
+		boolean sameDirectory = targetPath.equals(sourcePath);
+		if (sameDirectory && newName.equals(oldName)) {
+			return ImageResponse.from(image); // nothing changed
+		}
+
+		Directory target = source;
+		if (!sameDirectory) {
+			if (!storageService.directoryExists(targetPath)) {
+				throw new DirectoryNotFoundException(targetPath);
+			}
+			Optional<Directory> existing = directoryRepository.findByPath(targetPath);
+			// Checked before a missing row is created: a new one gets the
+			// picture's own group, like a merge.
+			authorizationService.checkAuthorization(authentication, existing.map(Directory::getGroup).orElse(source.getGroup()), Action.EDIT_SEQUENCE);
+			target = existing.orElseGet(() -> storageService.listMediaFileNames(targetPath).isEmpty()
+					? directoryRepository.save(new Directory(targetPath, source.getGroup(), LocalDate.now()))
+					: requireDirectory(indexDirectory(targetPath, source.getGroup().getGroupName()).id()));
+		}
+
+		// A case-only rename ("img.jpg" -> "IMG.jpg") finds itself on a
+		// case-insensitive disk (macOS), so only the database decides there.
+		boolean caseOnlyRename = sameDirectory && newName.equalsIgnoreCase(oldName);
+		if (imageRepository.existsByDirectory_IdAndName(target.getId(), newName)
+				|| (!caseOnlyRename && storageService.fileExists(targetPath, newName))) {
+			throw new ImageAlreadyExistsException(newName, target.getId());
+		}
+
+		MediaType mediaType = image.getMediaType();
+		moveFilesOrUndo(sourcePath, oldName, targetPath, newName, mediaType, caseOnlyRename);
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCompletion(int status) {
+				if (status != STATUS_COMMITTED) {
+					try {
+						moveFilesOrUndo(targetPath, newName, sourcePath, oldName, mediaType, caseOnlyRename);
+					} catch (RuntimeException e) {
+						log.error("Could not move {} back to {}/{} after a failed move", targetPath + "/" + newName, sourcePath, oldName, e);
+					}
+				}
+			}
+		});
+
+		image.moveTo(target, newName);
+		if (!sameDirectory) {
+			if (image.getCaptureDate() != null) {
+				target.setSequenceDate(DirectoryDateRules.updateDirDate(target.getSequenceDate(), image.getCaptureDate().toLocalDate()));
+			}
+			// A link to a sequence merged into the source showed this picture
+			// as one of its own; it has left that sequence now.
+			for (MergedSequence merged : mergedSequenceRepository.findByTargetDirectoryId(source.getId())) {
+				merged.getImageIds().remove(image.getId());
+			}
+		}
+		imageRepository.saveAndFlush(image); // a constraint failure here rolls back - and moves the files back
+		return ImageResponse.from(image);
+	}
+
+	/** Moves a picture's files; if that fails halfway, puts back what already moved before rethrowing. */
+	private void moveFilesOrUndo(String fromDir, String fromName, String toDir, String toName, MediaType mediaType, boolean caseOnlyRename) {
+		// Java's Files.move does nothing when source and target are the same
+		// file, which a case-only rename is on a case-insensitive disk - so
+		// that one goes through a temporary name.
+		String step = caseOnlyRename ? ".moving-" + System.nanoTime() + "-" + toName : toName;
+		try {
+			storageService.moveImageFiles(fromDir, fromName, toDir, step, mediaType);
+		} catch (RuntimeException e) {
+			undoQuietly(toDir, step, fromDir, fromName, mediaType);
+			throw e;
+		}
+		if (caseOnlyRename) {
+			try {
+				storageService.moveImageFiles(toDir, step, toDir, toName, mediaType);
+			} catch (RuntimeException e) {
+				undoQuietly(toDir, step, fromDir, fromName, mediaType);
+				throw e;
+			}
+		}
+	}
+
+	private void undoQuietly(String dir, String name, String backDir, String backName, MediaType mediaType) {
+		try {
+			storageService.moveImageFiles(dir, name, backDir, backName, mediaType);
+		} catch (RuntimeException ignored) {
+			// nothing (or only part) had moved - what's left is reported by the caller's exception
+		}
+	}
+
+	/** One file name, same extension as before (case aside), no path separator, not hidden. */
+	private static void requireValidFileName(String newName, String oldName) {
+		if (newName.contains("/") || newName.contains("\\")) {
+			throw new IllegalArgumentException("A file name can't contain / or \\ (got \"" + newName + "\")");
+		}
+		if (newName.startsWith(".")) {
+			throw new IllegalArgumentException("A file name can't start with a dot (got \"" + newName + "\")");
+		}
+		if (!extensionOf(newName).equalsIgnoreCase(extensionOf(oldName))) {
+			throw new IllegalArgumentException("A file name must keep its extension " + extensionOf(oldName) + " (got \"" + newName + "\")");
+		}
+	}
+
+	private static String extensionOf(String name) {
+		int dot = name.lastIndexOf('.');
+		return dot > 0 ? name.substring(dot) : "";
+	}
+
+	/** "" for the root; refuses ".", ".." and hidden segments, which would make disk and database disagree (see SequenceNames). */
+	private static String normalizeTargetPath(String path) {
+		String trimmed = path.trim();
+		while (trimmed.startsWith("/")) {
+			trimmed = trimmed.substring(1);
+		}
+		while (trimmed.endsWith("/")) {
+			trimmed = trimmed.substring(0, trimmed.length() - 1);
+		}
+		if (!trimmed.isEmpty()) {
+			for (String segment : trimmed.split("/")) {
+				if (segment.isEmpty() || segment.startsWith(".") || segment.contains("\\")) {
+					throw new IllegalArgumentException("Invalid target sequence: \"" + path + "\"");
+				}
+			}
+		}
+		return trimmed;
 	}
 
 	private void mergeDetails(Directory source, Directory target) {
@@ -493,7 +740,7 @@ public class DirectoryIndexerService {
 		return candidate;
 	}
 
-	private static final java.util.regex.Pattern DATED_SEQUENCE = java.util.regex.Pattern.compile("^\\d{4}/\\d{2}/[^/]+$");
+	private static final Pattern DATED_SEQUENCE = Pattern.compile("^\\d{4}/\\d{2}/[^/]+$");
 
 	/**
 	 * The new {@code yyyy/MM} parent for a sequence moved to another date

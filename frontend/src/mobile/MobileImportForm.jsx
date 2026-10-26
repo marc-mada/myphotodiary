@@ -83,6 +83,10 @@ import { isValidSequenceName } from '../gallery/sequenceName';
  * `onImported` fires once, after the whole batch, with the last file's
  * result - enough for the caller (MobileApp) to navigate to wherever
  * things landed, without re-navigating mid-upload while more files remain.
+ *
+ * `initialFiles` (21/10/2026, Share to myPhotoDiary - MobileSharedFilesPage):
+ * files already chosen elsewhere. No file picker then, and always sorted
+ * automatically (each file to its own year/month) into the named sequence.
  */
 
 // See handleFilesSelected's own comment - only ever applied to a captured
@@ -96,7 +100,11 @@ function withUniqueName(file) {
 	return new File([file], `${base}-${Date.now()}${ext}`, { type: file.type, lastModified: file.lastModified });
 }
 
-export function MobileImportForm({ capture, accept = 'image/*,video/mp4', multiple, buttonLabel, buttonIcon, currentDirectoryPath, onImported }) {
+export function MobileImportForm({ capture, accept = 'image/*,video/mp4', multiple, buttonLabel, buttonIcon, currentDirectoryPath, onImported, initialFiles, targetPath }) {
+	// `targetPath` (shared files only, 25/10/2026): undefined = sort by date into
+	// a new sequence (the default); a string = add every file to that existing
+	// folder; null = that option is on but no folder chosen yet.
+	const toExisting = targetPath !== undefined;
 	const { t } = useTranslation();
 	const fileInputRef = useRef(null);
 	// Single checkbox (25/09/2026, explicit ask - same simplification as
@@ -105,7 +113,7 @@ export function MobileImportForm({ capture, accept = 'image/*,video/mp4', multip
 	// true/false together under the hood.
 	const [sortAndCreate, setSortAndCreate] = useState(true);
 	const [subDirName, setSubDirName] = useState('');
-	const [selectedFiles, setSelectedFiles] = useState([]);
+	const [selectedFiles, setSelectedFiles] = useState(initialFiles ?? []);
 	const [uploading, setUploading] = useState(false);
 	const [progress, setProgress] = useState(null); // { done, total }
 	const [error, setError] = useState(null);
@@ -134,9 +142,11 @@ export function MobileImportForm({ capture, accept = 'image/*,video/mp4', multip
 	}
 
 	async function uploadOne(file) {
-		const params = new URLSearchParams({ autoSort: String(sortAndCreate), createSubDir: String(sortAndCreate) });
-		if (sortAndCreate && subDirName.trim()) params.set('subDirName', subDirName.trim());
-		if (!sortAndCreate && currentDirectoryPath) params.set('dirPath', currentDirectoryPath);
+		const byDate = sortAndCreate && !toExisting;
+		const params = new URLSearchParams({ autoSort: String(byDate), createSubDir: String(byDate) });
+		if (byDate && subDirName.trim()) params.set('subDirName', subDirName.trim());
+		const dirPath = toExisting ? targetPath : !sortAndCreate && currentDirectoryPath;
+		if (dirPath) params.set('dirPath', dirPath);
 		// Same signal, same reason as the desktop Uploader - see its own
 		// comment and backend ExifDateReader's javadoc (fallback #5).
 		if (Number.isFinite(file.lastModified)) params.set('clientLastModifiedEpochMillis', String(file.lastModified));
@@ -167,30 +177,69 @@ export function MobileImportForm({ capture, accept = 'image/*,video/mp4', multip
 	}
 
 	async function handleUpload() {
-		if (selectedFiles.length === 0) return;
+		if (selectedFiles.length === 0 || (toExisting && !targetPath)) return;
 		// Same rule as the server (../gallery/sequenceName.js), checked before
 		// anything is sent so the message is translated.
-		if (sortAndCreate && subDirName.trim() && !isValidSequenceName(subDirName)) {
+		if (!toExisting && sortAndCreate && subDirName.trim() && !isValidSequenceName(subDirName)) {
 			setError(t('directoryDetail.invalidSequenceName'));
 			return;
 		}
 		setUploading(true);
 		setError(null);
 		setProgress({ done: 0, total: selectedFiles.length });
+		// One refused file (an HEVC video, a name already used...) doesn't stop
+		// the others (22/10/2026, found re-testing Share to myPhotoDiary): it
+		// used to end the batch, and a retry re-sent the files already
+		// published, which then failed as duplicates. Only the failed files
+		// stay selected, so a retry sends just those. A permission refusal
+		// stops at once - every other file would get the same answer.
 		let lastResult = null;
-		try {
-			for (const file of selectedFiles) {
+		const failed = [];
+		for (let i = 0; i < selectedFiles.length; i++) {
+			const file = selectedFiles[i];
+			try {
 				lastResult = await uploadOne(file);
-				setProgress((p) => ({ ...p, done: p.done + 1 }));
+			} catch (err) {
+				if (err.status === 403) {
+					reportError(err);
+					failed.push(...selectedFiles.slice(i).map((f) => ({ file: f, message: null })));
+					break;
+				}
+				failed.push({ file, message: err.message });
 			}
-			setSelectedFiles([]);
-			if (lastResult) onImported(lastResult);
-		} catch (err) {
-			reportError(err);
-		} finally {
-			setUploading(false);
-			setProgress(null);
+			setProgress((p) => ({ ...p, done: p.done + 1 }));
 		}
+		setUploading(false);
+		setProgress(null);
+		setSelectedFiles(failed.map((f) => f.file));
+		if (failed.length === 0) {
+			if (lastResult) onImported(lastResult);
+		} else if (failed.some((f) => f.message)) {
+			setError(
+				[t('mobile.someFilesFailed', { count: failed.length }), ...failed.filter((f) => f.message).map((f) => `${f.file.name}: ${f.message}`)].join('\n'),
+			);
+		}
+	}
+
+	if (initialFiles) {
+		return (
+			<>
+				{!toExisting && (
+					<input
+						className="sequence-name-input"
+						placeholder={t('upload.sequenceNamePlaceholder')}
+						value={subDirName}
+						onChange={(e) => setSubDirName(e.target.value)}
+					/>
+				)}
+				{error && <p className="form-error mobile-import-error">{error}</p>}
+				<p className="mobile-selected-files">{t('mobile.picturesSelected', { count: selectedFiles.length })}</p>
+				<button type="button" onClick={handleUpload} disabled={uploading || selectedFiles.length === 0 || (toExisting && !targetPath)}>
+					{uploading ? (progress ? t('mobile.uploadingProgress', { done: progress.done, total: progress.total }) : t('mobile.uploading')) : t('mobile.upload')}{' '}
+					<MobileIcon name="action" />
+				</button>
+			</>
+		);
 	}
 
 	return (
@@ -221,7 +270,7 @@ export function MobileImportForm({ capture, accept = 'image/*,video/mp4', multip
 					)}
 				</label>
 			</div>
-			{error && <p className="form-error">{error}</p>}
+			{error && <p className="form-error mobile-import-error">{error}</p>}
 			<input
 				ref={fileInputRef}
 				type="file"

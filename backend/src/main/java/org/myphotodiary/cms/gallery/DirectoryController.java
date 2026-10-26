@@ -22,6 +22,8 @@ import org.myphotodiary.cms.gallery.dto.BatchIndexRequest;
 import org.myphotodiary.cms.gallery.dto.BatchIndexResult;
 import org.myphotodiary.cms.gallery.dto.DirectoryResponse;
 import org.myphotodiary.cms.gallery.dto.DirectoryTreeNode;
+import org.myphotodiary.cms.gallery.dto.ImageResponse;
+import org.myphotodiary.cms.gallery.dto.MoveImageRequest;
 import org.myphotodiary.cms.gallery.dto.RenameDirectoryRequest;
 import org.myphotodiary.cms.gallery.dto.UpdateDirectoryDetailRequest;
 import org.springframework.http.HttpStatus;
@@ -107,5 +109,11 @@ public class DirectoryController {
 	@PostMapping("/api/directories/{id}/rename")
 	public DirectoryResponse rename(Authentication authentication, @PathVariable Long id, @Valid @RequestBody RenameDirectoryRequest request) {
 		return indexerService.renameDirectory(authentication, id, request);
+	}
+
+	/** Rename and/or move one picture or video (19/10/2026) - see DirectoryIndexerService#moveImage. */
+	@PostMapping("/api/images/{imageId}/move")
+	public ImageResponse moveImage(Authentication authentication, @PathVariable Long imageId, @RequestBody MoveImageRequest request) {
+		return indexerService.moveImage(authentication, imageId, request);
 	}
 }

@@ -20,11 +20,17 @@ import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import './app.css';
 import './i18n';
-import { isLargeScreen } from './mobile/deviceDetection';
+import { isLargeScreen, isMobileDevice } from './mobile/deviceDetection';
+import { registerShareTarget } from './mobile/sharedFiles';
+import { applyRememberedPresentation } from './presentation';
 
 // Tablet-sized screen: larger mobile corner buttons/menu/banner (app.css).
 // Decided once from the physical screen, so rotating never changes it.
 document.documentElement.classList.toggle('mpd-large-screen', isLargeScreen());
+// Desktop presentation last used in this browser (presentation.js).
+applyRememberedPresentation();
+// Share to myPhotoDiary from another app (21/10/2026) - mobile only.
+if (isMobileDevice()) registerShareTarget();
 
 createRoot(document.getElementById('root')).render(
 	<StrictMode>

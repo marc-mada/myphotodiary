@@ -14,6 +14,7 @@
  * limitations under the License.
  ******************************************************************************/
 
+import { AppBanner } from '../components/AppBanner';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { shareApi } from '../api/share';
@@ -86,7 +87,7 @@ export function ShareScreen({ type, id, token }) {
 	return (
 		<div className="app-shell">
 			<nav className="screen-nav">
-				<img className="nav-logo" src="/legacy/photodiary-banner-short.png" alt={t('common.appName')} />
+				<AppBanner className="nav-logo" />
 			</nav>
 			<div className="app-screen">
 				<div className="gallery-screen">

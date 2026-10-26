@@ -209,6 +209,19 @@ class SharedSearchShareTest {
 	}
 
 	@Test
+	void videosOnlySearch_isSharedOnlyWhenVideoSharingIsAllowed() throws IOException {
+		galleryService.uploadImage(auth, directoryId, jpegFile("photo.jpg"));
+		Image video = imageRepository.save(new Image("clip.mp4", directoryRepository.findById(directoryId).orElseThrow(), LocalDateTime.now(), MediaType.VIDEO));
+		SearchShareRequest videosOnly = new SearchShareRequest(null, null, null, null, needle, "VIDEO");
+
+		assertThatThrownBy(() -> shareController.shareSearch(auth, videosOnly)).isInstanceOf(IllegalArgumentException.class);
+
+		appSettingsService.updateAllowVideoSharing(true);
+		SearchShareResponse shared = shareController.shareSearch(auth, videosOnly);
+		assertThat(shareController.publicSearchShare(shared.id(), shared.token()).images()).extracting(PublicImageResponse::id).containsExactly(video.getId());
+	}
+
+	@Test
 	void noCriteria_orNothingToShare_isRefused() {
 		assertThatThrownBy(() -> shareController.shareSearch(auth, new SearchShareRequest(List.of(), null, null, null, "abc")))
 				.isInstanceOf(IllegalArgumentException.class);

@@ -16,6 +16,7 @@
 
 package org.myphotodiary.cms.gallery;
 
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -36,6 +37,24 @@ public interface ImageRepository extends JpaRepository<Image, Long> {
 	// directory listing wasn't already going to need anyway.
 	@EntityGraph(attributePaths = "attributes")
 	List<Image> findByDirectory_IdOrderByNameAsc(Long directoryId);
+
+	// Display order of a sequence (26/10/2026): capture date, oldest first,
+	// then file name. Name order alone breaks as soon as a sequence mixes
+	// cameras or phones - "20261022_101433.jpg" sorts before "PC253561.jpeg"
+	// whatever the dates. A picture without a date goes last.
+	@EntityGraph(attributePaths = "attributes")
+	@Query("select i from Image i where i.directory.id = :directoryId order by i.captureDate asc nulls last, i.name asc, i.id asc")
+	List<Image> findSequenceInDisplayOrder(@Param("directoryId") Long directoryId);
+
+	/** Same order as findSequenceInDisplayOrder, for pictures already loaded. */
+	Comparator<Image> DISPLAY_ORDER = Comparator
+			.comparing(Image::getCaptureDate, Comparator.nullsLast(Comparator.naturalOrder()))
+			.thenComparing(Image::getName)
+			.thenComparing(Image::getId);
+
+	/** Earliest capture date of each of these folders' pictures - [path, LocalDateTime] rows, folders without dated pictures omitted. */
+	@Query("select i.directory.path, min(i.captureDate) from Image i where i.directory.path in :paths and i.captureDate is not null group by i.directory.path")
+	List<Object[]> findEarliestCaptureDates(@Param("paths") List<String> paths);
 
 	boolean existsByDirectory_IdAndName(Long directoryId, String name);
 
