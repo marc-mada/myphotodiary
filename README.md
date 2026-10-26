@@ -76,7 +76,7 @@ see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Release Notes
 
-### Unreleased
+### 2.12.0 — 2026-10-26
 
 - Mobile: the menu's **Camera** and **Film** entries are now hidden by
   default; a new per-user setting, **Online capture** (Admin → Configure),
@@ -84,7 +84,9 @@ see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 - Mobile (Android): **share pictures and videos to myPhotoDiary** from
   another app (WhatsApp, the gallery…) once the app is installed on the
   home screen. Each file is published to the year/month of its own date,
-  into the sequence you name. Not possible on iPhone/iPad.
+  into the sequence you name — or, alternatively, into an existing
+  sequence picked from recent ones or by browsing the tree. Not possible
+  on iPhone/iPad.
 - Mobile: myPhotoDiary can now really be installed on Android (larger app
   icons). Before, the browser could only add a home-screen shortcut.
 - Mobile: when some files of an upload are refused (an HEVC video, a name
@@ -113,6 +115,12 @@ see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
   folder) now also picks up H.264 videos copied straight onto the server's
   disk, and the folder tree counts videos (a folder of videos no longer
   shows 0).
+- Pictures of a sequence are now shown in the order they were taken
+  (pictures from several cameras no longer grouped by file name), and the
+  sequences of a month are sorted by the date of their first picture.
+- **Fix** (desktop): a folder whose pictures were moved away on disk no
+  longer shows an endless loading bar; re-indexing it now cleans up its
+  stale entries.
 - Share links of a sequence keep working after it is merged into another
   one, still showing only that sequence's own pictures.
 
