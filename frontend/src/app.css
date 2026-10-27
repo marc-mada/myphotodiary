@@ -670,6 +670,14 @@ button:hover {
 	width: auto;
 }
 
+/* A short explanation under a setting (27/10/2026, video compaction). */
+.config-panel-form .config-hint {
+	width: 100%;
+	margin: -0.25rem 0 0;
+	font-size: 0.8rem;
+	color: var(--mpd-text-muted);
+}
+
 /* App-wide settings (28/08/2026, video support) - a second, visually
    distinct .config-panel-form box (own white surface, own margin-top
    already applied generically above) so it doesn't read as one more field
@@ -1107,6 +1115,20 @@ table {
 	max-width: 100%;
 	max-height: 100%;
 	object-fit: contain;
+}
+
+/* "Preparing video..." / "can't be played" (AuthVideo, 27/10/2026) - shown
+   in place of a <video> the browser can't play while its H.264 copy is
+   being made. Desktop and mobile alike. */
+.video-status {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	padding: 1rem;
+	color: var(--mpd-text-muted);
 }
 
 /* Progressive image loading (ProgressiveImage.jsx, 10/09/2026, explicit ask

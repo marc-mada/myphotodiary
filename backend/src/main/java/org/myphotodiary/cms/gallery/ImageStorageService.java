@@ -92,6 +92,10 @@ public class ImageStorageService {
 	// under a separate root of their own the way this class used to.
 	private static final String THUMBNAIL_DIR_NAME = ".thumbnails";
 	private static final String WEBIMG_DIR_NAME = ".webimg";
+	// Where background video encodes are written before being moved into
+	// place (27/10/2026) - under the storage root so the final move is on the
+	// same disk (atomic), hidden so neither the tree nor indexing sees it.
+	private static final String VIDEO_WORK_DIR_NAME = ".video-work";
 
 	private final Path root;
 	private final VideoThumbnailExtractor videoThumbnailExtractor;
@@ -210,6 +214,95 @@ public class ImageStorageService {
 	/** Whether a video's thumbnail ({@code .thumbnails/<name>.jpg}) exists. */
 	public boolean videoThumbnailExists(String directoryPath, String videoName) {
 		return Files.exists(resolveVideoThumbnail(directoryPath, videoName));
+	}
+
+	/**
+	 * The file a video plays from (27/10/2026): its H.264 copy
+	 * ({@code .webimg/<name>.mp4}) once made, otherwise the original - while
+	 * the copy is pending, or for an original that never needed one.
+	 */
+	public Path resolvePlayableVideo(Image video) {
+		String directoryPath = video.getDirectory().getPath();
+		if (video.getVideoPlayback() == VideoPlayback.COPY) {
+			Path copy = resolveVideoCopy(directoryPath, video.getName());
+			if (Files.exists(copy)) {
+				return copy;
+			}
+		}
+		return resolveOriginal(directoryPath, video.getName());
+	}
+
+	public boolean videoCopyExists(String directoryPath, String videoName) {
+		return Files.exists(resolveVideoCopy(directoryPath, videoName));
+	}
+
+	/** Moves a finished playback copy from the work folder into {@code .webimg/<name>.mp4}, replacing any older one. */
+	public void installVideoCopy(String directoryPath, String videoName, Path encoded) {
+		Path copy = resolveVideoCopy(directoryPath, videoName);
+		try {
+			Files.createDirectories(copy.getParent());
+			moveReplacing(encoded, copy);
+		} catch (IOException e) {
+			throw new UncheckedIOException("Failed to store the playback copy of " + directoryPath + "/" + videoName, e);
+		}
+	}
+
+	/**
+	 * Puts a compacted original in place of the current one (27/10/2026).
+	 * {@code newName} differs when the container changes (clip.avi becomes
+	 * clip.mp4): the thumbnail and playback copy follow the new name and the
+	 * old original is deleted. Written so that a failure part-way never
+	 * leaves the video without an original: the new file is in place before
+	 * the old one is removed.
+	 */
+	public void replaceVideoOriginal(String directoryPath, String oldName, String newName, Path encoded) {
+		Path newOriginal = resolveOriginal(directoryPath, newName);
+		try {
+			moveReplacing(encoded, newOriginal);
+			if (!oldName.equals(newName)) {
+				moveIfExists(resolveVideoThumbnail(directoryPath, oldName), resolveVideoThumbnail(directoryPath, newName), false);
+				moveIfExists(resolveVideoCopy(directoryPath, oldName), resolveVideoCopy(directoryPath, newName), false);
+				Files.deleteIfExists(resolveOriginal(directoryPath, oldName));
+			}
+		} catch (IOException e) {
+			throw new UncheckedIOException("Failed to replace the original of " + directoryPath + "/" + oldName, e);
+		}
+	}
+
+	/** Atomic when the work folder and the target are on the same disk (the normal case), a plain move otherwise. */
+	private static void moveReplacing(Path from, Path to) throws IOException {
+		try {
+			Files.move(from, to, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+		} catch (java.nio.file.AtomicMoveNotSupportedException e) {
+			Files.move(from, to, StandardCopyOption.REPLACE_EXISTING);
+		}
+	}
+
+	/** The work folder for background video encodes, created if missing. */
+	public Path videoWorkDirectory() {
+		Path dir = root.resolve(VIDEO_WORK_DIR_NAME);
+		try {
+			Files.createDirectories(dir);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+		return dir;
+	}
+
+	/** Removes what an interrupted encode left in the work folder (called at start-up, before any job runs). */
+	public void clearVideoWorkDirectory() {
+		Path dir = root.resolve(VIDEO_WORK_DIR_NAME);
+		if (Files.isDirectory(dir)) {
+			deleteRecursively(dir);
+		}
+	}
+
+	public long fileSize(Path file) {
+		try {
+			return Files.size(file);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 	}
 
 	/**
@@ -790,6 +883,7 @@ public class ImageStorageService {
 		// resolveThumbnail/resolveVideoThumbnail's path this particular image
 		// never had in the first place.
 		deleteQuietly(resolveVideoThumbnail(directoryPath, imageName));
+		deleteQuietly(resolveVideoCopy(directoryPath, imageName));
 	}
 
 	private void deleteQuietly(Path path) {
@@ -1015,6 +1109,9 @@ public class ImageStorageService {
 		moveIfExists(video ? resolveVideoThumbnail(fromDir, fromName) : resolveThumbnail(fromDir, fromName),
 				video ? resolveVideoThumbnail(toDir, toName) : resolveThumbnail(toDir, toName), false);
 		moveIfExists(resolveWeb(fromDir, fromName), resolveWeb(toDir, toName), false);
+		if (video) {
+			moveIfExists(resolveVideoCopy(fromDir, fromName), resolveVideoCopy(toDir, toName), false);
+		}
 	}
 
 	/** Moves a plain file that has no picture row (sequence merge) - original only, no derivatives. */
@@ -1171,6 +1268,11 @@ public class ImageStorageService {
 	 */
 	private Path resolveVideoThumbnail(String directoryPath, String videoName) {
 		return PathUtil.resolveUnderRoot(root, directoryPath, THUMBNAIL_DIR_NAME + "/" + videoName + ".jpg");
+	}
+
+	/** A video's H.264 playback copy: {@code .webimg/<video's own name>.mp4} - appended like its thumbnail's {@code .jpg}. */
+	private Path resolveVideoCopy(String directoryPath, String videoName) {
+		return PathUtil.resolveUnderRoot(root, directoryPath, WEBIMG_DIR_NAME + "/" + videoName + ".mp4");
 	}
 
 	/** {@code <root>/<directoryPath>/.webimg/<imageName>} - see {@link #resolveThumbnail}'s own comment for the layout/traversal-guard reasoning, identical here. */

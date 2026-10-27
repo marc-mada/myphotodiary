@@ -175,7 +175,7 @@ public class ShareController {
 		if (image.getMediaType() != org.myphotodiary.cms.gallery.MediaType.VIDEO) {
 			throw new IllegalArgumentException("Not a video: " + imageId);
 		}
-		return VideoRangeResponses.serve(storageService.resolveOriginal(image.getDirectory().getPath(), image.getName()), headers);
+		return VideoRangeResponses.serve(storageService.resolvePlayableVideo(image), headers);
 	}
 
 	@GetMapping("/api/public/sequences/{directoryId}")

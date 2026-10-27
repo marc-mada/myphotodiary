@@ -413,9 +413,9 @@ public class GalleryService {
 	 * {@link #updateImage} - a rotation is an edit to the image's own
 	 * content, not a new action needing its own place in the {@code Action}
 	 * matrix. Rejects a video outright (Rotate is a photo-only control -
-	 * rotating a video's own frames would mean re-encoding the whole file,
-	 * a transcoding operation this project has deliberately never done for
-	 * video, Design.md §8's "no transcoding" video policy) - the frontend
+	 * rotating a video's own frames would mean re-encoding the whole file;
+	 * the only video re-encoding this project does is the background
+	 * playback copy/compaction of VideoProcessingService, never an edit) - the frontend
 	 * already never shows the Rotate button for a video item, this is the
 	 * server-side backstop.
 	 */
@@ -481,8 +481,8 @@ public class GalleryService {
 	 * separately cropped). Same {@code EDIT_IMAGE}/video-rejection shape as
 	 * {@link #rotateImage} - a crop is an edit to the image's own content,
 	 * not a new action of its own in the {@code Action} matrix, and
-	 * (Design.md §8's "no transcoding" video policy) this project has never
-	 * done pixel-level editing of video frames.
+	 * this project has never done pixel-level editing of video frames
+	 * (VideoProcessingService only re-encodes, never edits).
 	 */
 	@Transactional
 	public void cropImage(Authentication authentication, Long imageId, CropImageRequest request) {

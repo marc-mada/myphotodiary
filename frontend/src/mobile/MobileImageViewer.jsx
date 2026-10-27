@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AuthImage } from '../gallery/AuthImage';
-import { AuthVideo } from '../gallery/AuthVideo';
+import { AuthVideo, PublicVideo } from '../gallery/AuthVideo';
 import { ProgressiveImage } from '../gallery/ProgressiveImage';
 import { useDoubleTap } from './useDoubleTap';
 import { useBlockNativePageZoom } from './useBlockNativePageZoom';
@@ -384,9 +384,9 @@ export function MobileImageViewer({
 				{image.mediaType === 'VIDEO' ? (
 					image.streamUrl ? (
 						// Shared video (share link, 14/10/2026): public stream URL.
-						<video src={image.streamUrl} controls className="mobile-visible-image" />
+						<PublicVideo src={image.streamUrl} playback={image.videoPlayback} className="mobile-visible-image" />
 					) : (
-						<AuthVideo imageId={image.id} className="mobile-visible-image" />
+						<AuthVideo imageId={image.id} playback={image.videoPlayback} className="mobile-visible-image" />
 					)
 				) : progressive ? (
 					<ProgressiveImage src={image.webUrl} thumbnailSrc={image.thumbnailUrl} alt={image.name} className="mobile-visible-image" />

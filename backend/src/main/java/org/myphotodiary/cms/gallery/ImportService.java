@@ -73,29 +73,18 @@ public class ImportService {
 
 	private static final String DEFAULT_GROUP = "public";
 
-	// Strict H.264-only policy decided during the video talk (28/08/2026) -
-	// codec, not container: VideoFormatValidator's own real, codec-level
-	// check (ffprobe) is what actually enforces H.264(+AAC), and it was
-	// always container-agnostic (its own javadoc already anticipated a
-	// `.mov` container - "an iPhone's default HEVC recording is commonly
-	// muxed in a .mov container"). This set only decides *which* path a
-	// file takes in the first place, so a container extension missing here
-	// never reaches that check at all - it silently falls through to
-	// MediaType.IMAGE instead (detectMediaType's own default branch) and
-	// crashes trying to decode video bytes as a picture.
-	//
-	// "mov" added 03/09/2026 - real bug found live on iPad: MobileMoviePage
-	// records via the device's own native camera app (triggered by
-	// `capture`), which produces a `.mov` QuickTime container regardless of
-	// this app's own `accept="video/mp4"` hint (that attribute only steers
-	// *picker* file-type filtering, never the format a device's camera
-	// itself records in) - exactly the case this class's own
-	// VideoFormatValidator was already written to expect, just never
-	// reachable for it before this fix. Package-private, not private
-	// (01/09/2026) - StagingImportService reuses this to decide which
-	// staging files are import candidates, same reason as
-	// ImageStorageService.IMAGE_EXTENSIONS/hasImageExtension.
-	static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "mov");
+	// Which files take the video path. Until 27/10/2026 only "mp4"/"mov"
+	// (H.264 only, nothing transcoded - "mov" added 03/09/2026 for the
+	// iPhone's native camera). Since option C, any video ffmpeg can read is
+	// accepted and a playback copy made when needed (VideoProcessingService):
+	// phones (mp4, mov, m4v, 3gp), camcorders (mts/m2ts AVCHD, mpg/vob DVD,
+	// dv MiniDV), old compact cameras and PCs (avi, wmv, mkv, webm). The
+	// real check is still the codec probe (VideoFormatValidator), not this
+	// list - it only routes a file away from the picture path. Package-
+	// private (01/09/2026): StagingImportService reuses it to pick its import
+	// candidates, like ImageStorageService.IMAGE_EXTENSIONS.
+	static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "mov", "m4v", "3gp", "mts", "m2ts", "mpg", "mpeg", "vob", "dv", "avi", "wmv",
+			"mkv", "webm");
 
 	// One lock per directory path, created on first use and never removed
 	// (deliberately - see resolveOrCreateDirectory's own javadoc for why a
@@ -119,10 +108,12 @@ public class ImportService {
 	private final GalleryAuthorizationService authorizationService;
 	private final AppSettingsService appSettingsService;
 	private final VideoFormatValidator videoFormatValidator;
+	private final VideoProcessingService videoProcessingService;
 
 	public ImportService(DirectoryRepository directoryRepository, ImageRepository imageRepository, GroupRepository groupRepository,
 			ImageStorageService storageService, ExifDateReader exifDateReader, ExifGpsReader exifGpsReader,
-			GalleryAuthorizationService authorizationService, AppSettingsService appSettingsService, VideoFormatValidator videoFormatValidator) {
+			GalleryAuthorizationService authorizationService, AppSettingsService appSettingsService, VideoFormatValidator videoFormatValidator,
+			VideoProcessingService videoProcessingService) {
 		this.directoryRepository = directoryRepository;
 		this.imageRepository = imageRepository;
 		this.groupRepository = groupRepository;
@@ -132,6 +123,7 @@ public class ImportService {
 		this.authorizationService = authorizationService;
 		this.appSettingsService = appSettingsService;
 		this.videoFormatValidator = videoFormatValidator;
+		this.videoProcessingService = videoProcessingService;
 	}
 
 	/**
@@ -183,7 +175,7 @@ public class ImportService {
 		Path tempFile = createTempFile(originalFilename);
 		try {
 			file.transferTo(tempFile);
-			validateVideoIfNeeded(tempFile, mediaType);
+			VideoInfo videoInfo = validateVideoIfNeeded(tempFile, mediaType, true);
 
 			// No EXIF in a video file - ExifDateReader's own generic
 			// metadata-extractor read simply finds no ExifSubIFDDirectory and
@@ -198,7 +190,7 @@ public class ImportService {
 			}
 
 			String targetPath = computeTargetPath(autoSort, createSubDir, subDirName, dirPath, imgDate);
-			return storeImportedFile(authentication, originalFilename, mediaType, autoSort, imgDate, targetPath, tempFile, groupName, true);
+			return storeImportedFile(authentication, originalFilename, mediaType, videoInfo, autoSort, imgDate, targetPath, tempFile, groupName, true);
 		} catch (IOException e) {
 			throw new UncheckedIOException("Failed to import " + originalFilename, e);
 		} finally {
@@ -267,7 +259,9 @@ public class ImportService {
 			LocalDateTime fallbackDate, LocalDateTime forcedDate, String groupName) {
 		MediaType mediaType = detectMediaType(originalFilename);
 		try {
-			validateVideoIfNeeded(sourceFile, mediaType);
+			// No size limit here: Batch Publish is run by an admin on files
+			// already on the server (archive captures - DV, VHS - are large).
+			VideoInfo videoInfo = validateVideoIfNeeded(sourceFile, mediaType, false);
 
 			LocalDateTime imgDate = forcedDate != null
 					? forcedDate
@@ -279,23 +273,29 @@ public class ImportService {
 			}
 
 			String targetPath = computeTargetPath(true, true, sequenceName, null, imgDate);
-			return storeImportedFile(authentication, originalFilename, mediaType, true, imgDate, targetPath, sourceFile, groupName, false);
+			return storeImportedFile(authentication, originalFilename, mediaType, videoInfo, true, imgDate, targetPath, sourceFile, groupName, false);
 		} catch (IOException e) {
 			throw new UncheckedIOException("Failed to import " + originalFilename, e);
 		}
 	}
 
-	private void validateVideoIfNeeded(Path file, MediaType mediaType) throws IOException {
-		if (mediaType != MediaType.VIDEO) return;
+	/** {@code null} for a picture. {@code checkSize}: browser uploads only. */
+	private VideoInfo validateVideoIfNeeded(Path file, MediaType mediaType, boolean checkSize) throws IOException {
+		if (mediaType != MediaType.VIDEO) return null;
+		if (checkSize) {
+			checkVideoSize(file);
+		}
+		// Codec-level probe, not just the extension used to route here - see
+		// VideoFormatValidator's own javadoc.
+		return videoFormatValidator.validate(file);
+	}
+
+	private void checkVideoSize(Path file) throws IOException {
 		long maxBytes = appSettingsService.get().getMaxVideoSizeBytes();
 		long actualBytes = Files.size(file);
 		if (actualBytes > maxBytes) {
 			throw new IllegalArgumentException("Video (" + actualBytes + " bytes) exceeds the configured maximum of " + maxBytes + " bytes");
 		}
-		// Codec-level check (not just the .mp4 extension already used to route
-		// here) - see VideoFormatValidator's own javadoc for why the extension
-		// alone can't tell H.264 and HEVC apart.
-		videoFormatValidator.validate(file);
 	}
 
 	/**
@@ -311,7 +311,7 @@ public class ImportService {
 	 * {@link ImageStorageService#storeFromStagingFile}'s own javadoc for why
 	 * that one must never delete the admin's own source file).
 	 */
-	private ImportResponse storeImportedFile(Authentication authentication, String originalFilename, MediaType mediaType, boolean autoSort,
+	private ImportResponse storeImportedFile(Authentication authentication, String originalFilename, MediaType mediaType, VideoInfo videoInfo, boolean autoSort,
 			LocalDateTime imgDate, String targetPath, Path sourceFile, String groupName, boolean moveSource) throws IOException {
 		// Checked before any persistence, and against whichever group
 		// actually applies (the resolved target directory's own group if
@@ -359,6 +359,9 @@ public class ImportService {
 			} else {
 				storageService.storeVideoFromStagingFile(targetPath, originalFilename, sourceFile);
 			}
+			// Thumbnail made just above, synchronously; the playback copy (if
+			// this video needs one) is queued for after this commit.
+			videoProcessingService.registerNewVideo(image, videoInfo);
 		} else {
 			if (moveSource) {
 				storageService.storeFromTempFile(targetPath, originalFilename, sourceFile);

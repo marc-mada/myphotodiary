@@ -77,13 +77,16 @@ public class DirectoryIndexerService {
 	private final GalleryAuthorizationService authorizationService;
 	private final VideoFormatValidator videoFormatValidator;
 	private final MergedSequenceRepository mergedSequenceRepository;
+	private final VideoProcessingService videoProcessingService;
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DirectoryIndexerService.class);
 
 	public DirectoryIndexerService(DirectoryRepository directoryRepository, ImageRepository imageRepository,
 			AttributeRepository attributeRepository, GroupRepository groupRepository, ImageStorageService storageService,
 			ExifDateReader exifDateReader, ExifGpsReader exifGpsReader, GalleryAuthorizationService authorizationService,
-			VideoFormatValidator videoFormatValidator, MergedSequenceRepository mergedSequenceRepository) {
+			VideoFormatValidator videoFormatValidator, MergedSequenceRepository mergedSequenceRepository,
+			VideoProcessingService videoProcessingService) {
 		this.videoFormatValidator = videoFormatValidator;
+		this.videoProcessingService = videoProcessingService;
 		this.mergedSequenceRepository = mergedSequenceRepository;
 		this.directoryRepository = directoryRepository;
 		this.imageRepository = imageRepository;
@@ -327,20 +330,23 @@ public class DirectoryIndexerService {
 
 	/**
 	 * A video file met while indexing (17/10/2026). A new one (dropped on
-	 * disk) gets a row only if it passes the same H.264/AAC check as an
-	 * upload (VideoFormatValidator) - a browser couldn't play anything else;
-	 * it is skipped (logged) otherwise. The size limit isn't applied: it
+	 * disk) gets a row if ffprobe can read it - any codec since 27/10/2026,
+	 * a playback copy being queued when needed (VideoProcessingService); an
+	 * unreadable one is skipped (logged). The size limit isn't applied: it
 	 * guards uploads, and this file is already on the server. An existing
 	 * row keeps its date (an upload may have dated it from the browser, which
-	 * the file itself can't tell again). Its thumbnail is created if missing.
-	 * Returns the video's day, for the sequence date, or null if skipped.
+	 * the file itself can't tell again), and its playback state is repaired
+	 * (missing copy, failed job, video stored before option C). Its
+	 * thumbnail is created if missing. Returns the video's day, for the
+	 * sequence date, or null if skipped.
 	 */
 	private LocalDate indexVideo(Directory directory, String directoryPath, String name, Image existing, LocalDateTime sequenceDefault) {
 		Image video = existing;
+		VideoInfo newVideoInfo = null;
 		if (video == null) {
 			var file = storageService.resolveOriginal(directoryPath, name);
 			try {
-				videoFormatValidator.validate(file);
+				newVideoInfo = videoFormatValidator.validate(file);
 			} catch (RuntimeException e) {
 				log.warn("Not indexing video {}/{}: {}", directoryPath, name, e.getMessage());
 				return null;
@@ -353,6 +359,11 @@ public class DirectoryIndexerService {
 			} catch (RuntimeException e) {
 				log.warn("No thumbnail for video {}/{}: {}", directoryPath, name, e.getMessage());
 			}
+		}
+		if (newVideoInfo != null) {
+			videoProcessingService.registerNewVideo(video, newVideoInfo);
+		} else {
+			videoProcessingService.reconcile(video);
 		}
 		return video.getCaptureDate() != null ? video.getCaptureDate().toLocalDate() : null;
 	}

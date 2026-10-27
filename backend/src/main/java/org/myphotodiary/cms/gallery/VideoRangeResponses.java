@@ -59,7 +59,15 @@ final class VideoRangeResponses {
 		// extension the original upload happened to arrive with, so the
 		// original extension was never the right signal for this header to
 		// begin with.
-		MediaType contentType = MediaType.valueOf("video/mp4");
+		//
+		// Since 27/10/2026 (option C) the file served is the H.264 playback copy
+		// when there is one (always .mp4), else the original: a WebM original
+		// says so (browsers play VP9/AV1 WebM), anything else stays video/mp4 -
+		// a browser that can't play it fires an error and the viewer shows
+		// "Preparing video..." until the copy exists.
+		MediaType contentType = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".webm")
+				? MediaType.valueOf("video/webm")
+				: MediaType.valueOf("video/mp4");
 
 		List<HttpRange> ranges = headers.getRange();
 		if (ranges.isEmpty()) {

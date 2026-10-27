@@ -197,7 +197,10 @@
     "maxShareSize": "Número máximo de fotos en un resultado de búsqueda compartido",
     "allowVideoSharing": "Permitir compartir vídeos por enlace (se transmiten desde este servidor a cualquiera que tenga el enlace)",
     "presentation": "Presentación (escritorio)",
-    "onlineCapture": "Captura en línea (móvil: Fotografiar y Grabar en el menú)"
+    "onlineCapture": "Captura en línea (móvil: Fotografiar y Grabar en el menú)",
+    "compactOriginalVideos": "Compactar los vídeos originales en formatos antiguos o pesados (recodificar a HEVC)",
+    "compactOriginalVideosHint": "ProRes, DV, MJPEG, MPEG-2, AVI… se recodifican en segundo plano después de su copia de reproducción. Definitivo: el archivo original se sustituye por uno más pequeño.",
+    "videoJobs": "Vídeos pendientes de procesar: {{waiting}}. Con error: {{failed}}."
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "nueva/ruta/de/carpeta",
@@ -316,5 +319,10 @@
     "old-rose": "Galería rosa antiguo",
     "deep-blue": "Galería azul profundo",
     "lagoon": "Galería laguna"
+  },
+  "video": {
+    "preparing": "Preparando el vídeo… Se reproducirá aquí en cuanto esté listo.",
+    "preparingShared": "Este vídeo todavía se está preparando. Inténtelo de nuevo en unos minutos.",
+    "unavailable": "Este vídeo no se puede reproducir en este navegador."
   }
 }

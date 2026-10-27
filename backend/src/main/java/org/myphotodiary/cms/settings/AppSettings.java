@@ -53,6 +53,10 @@ public class AppSettings {
 	@Column(name = "allow_video_sharing", nullable = false)
 	private boolean allowVideoSharing;
 
+	/** V19 - re-encode originals in inefficient codecs to HEVC (27/10/2026), see VideoProcessingService. */
+	@Column(name = "compact_original_videos", nullable = false)
+	private boolean compactOriginalVideos;
+
 	protected AppSettings() {
 		// JPA
 	}
@@ -91,5 +95,13 @@ public class AppSettings {
 
 	public void setAllowVideoSharing(boolean allowVideoSharing) {
 		this.allowVideoSharing = allowVideoSharing;
+	}
+
+	public boolean isCompactOriginalVideos() {
+		return compactOriginalVideos;
+	}
+
+	public void setCompactOriginalVideos(boolean compactOriginalVideos) {
+		this.compactOriginalVideos = compactOriginalVideos;
 	}
 }

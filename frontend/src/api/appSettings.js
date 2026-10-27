@@ -34,4 +34,8 @@ export const appSettingsApi = {
 	// {version} of the backend actually running on the server (VersionController,
 	// 26/09/2026) - not the frontend bundle's own package.json version.
 	version: () => apiFetch('/api/version'),
+
+	// {pending, running, failed} background video jobs (VideoJobController,
+	// 27/10/2026, ADMIN-only) - playback copies and compactions.
+	videoJobs: () => apiFetch('/api/admin/video-jobs'),
 };

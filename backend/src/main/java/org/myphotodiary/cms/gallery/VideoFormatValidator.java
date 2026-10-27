@@ -28,18 +28,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Enforces the "strict MP4/H.264 only" policy decided during the video talk
- * (28/08/2026) - no server-side transcoding, so whatever's uploaded has to
- * already be playable by a plain HTML5 {@code <video>} tag everywhere,
- * including Safari/iOS (no native WebM; HEVC plays there but not reliably
- * elsewhere). Trusting the file extension/declared content-type alone isn't
- * enough for a real guarantee: an iPhone's default HEVC recording is
- * commonly muxed in a `.mov` container, but HEVC-in-`.mp4` is also possible,
- * so the container extension alone can't tell H.264 and HEVC apart - only
- * probing the actual codec can. Uses ffprobe (bundled with ffmpeg, already a
- * hard dependency of this feature for thumbnail extraction - see
- * VideoThumbnailExtractor) rather than a Java video-parsing library, same
- * "invoke the standard external tool" choice as that class.
+ * Reads a video with ffprobe (bundled with ffmpeg, already this feature's
+ * dependency for thumbnails - see VideoThumbnailExtractor) and rejects only
+ * what isn't a readable video at all.
+ *
+ * Until 27/10/2026 this enforced "H.264 + AAC only" (no transcoding - a
+ * browser had to play the file as uploaded). Since then any video ffmpeg can
+ * read is accepted - HEVC from iPhones, AVI/DV/MPEG-2 from old cameras and
+ * camcorders, MKV... - and {@link VideoProcessingService} makes an H.264
+ * copy when the original isn't playable everywhere. The codec still has to
+ * be probed rather than trusted from the extension: an iPhone's HEVC can sit
+ * in a `.mov` or a `.mp4` alike.
  */
 @Component
 public class VideoFormatValidator {
@@ -51,37 +50,66 @@ public class VideoFormatValidator {
 		this.ffprobePath = ffprobePath;
 	}
 
-	/** @throws IllegalArgumentException if the file isn't a valid H.264 (+ AAC or no audio) MP4. */
-	public void validate(Path file) {
+	/** @throws IllegalArgumentException if the file isn't a readable video (no video stream). */
+	public VideoInfo validate(Path file) {
 		JsonNode root = probe(file);
 		JsonNode streams = root.path("streams");
 		if (!streams.isArray() || streams.isEmpty()) {
 			throw new IllegalArgumentException("Not a readable video file (ffprobe found no streams)");
 		}
-
-		boolean hasVideoStream = false;
+		JsonNode video = null;
+		JsonNode audio = null;
 		for (JsonNode stream : streams) {
 			String codecType = stream.path("codec_type").asText("");
-			String codecName = stream.path("codec_name").asText("");
-			if ("video".equals(codecType)) {
-				hasVideoStream = true;
-				if (!"h264".equals(codecName)) {
-					throw new IllegalArgumentException(
-							"Video codec must be H.264 (found: " + codecName + "). "
-									+ "Phones often record HEVC by default (e.g. iPhone's \"High Efficiency\" setting) - "
-									+ "please re-export/convert to H.264 MP4 before uploading.");
-				}
-			} else if ("audio".equals(codecType) && !"aac".equals(codecName)) {
-				throw new IllegalArgumentException("Audio codec must be AAC (found: " + codecName + ")");
+			// An attached picture (cover art) is reported as a video stream too - not the video.
+			boolean coverArt = stream.path("disposition").path("attached_pic").asInt(0) == 1;
+			if ("video".equals(codecType) && !coverArt && video == null) {
+				video = stream;
+			} else if ("audio".equals(codecType) && audio == null) {
+				audio = stream;
 			}
 		}
-		if (!hasVideoStream) {
+		if (video == null) {
 			throw new IllegalArgumentException("File has no video stream");
+		}
+		JsonNode format = root.path("format");
+		String transfer = video.path("color_transfer").asText("");
+		String fieldOrder = video.path("field_order").asText("progressive");
+		return new VideoInfo(
+				format.path("format_name").asText(""),
+				video.path("codec_name").asText(""),
+				audio == null ? null : audio.path("codec_name").asText(""),
+				video.path("width").asInt(0),
+				video.path("height").asInt(0),
+				frameRate(video),
+				format.path("bit_rate").asLong(0),
+				video.path("pix_fmt").asText(""),
+				!"progressive".equals(fieldOrder) && !"unknown".equals(fieldOrder) && !fieldOrder.isEmpty(),
+				"smpte2084".equals(transfer) || "arib-std-b67".equals(transfer),
+				format.path("duration").asDouble(0));
+	}
+
+	/** avg_frame_rate when known, else r_frame_rate - both are fractions like "30000/1001". */
+	private static double frameRate(JsonNode video) {
+		double avg = fraction(video.path("avg_frame_rate").asText(""));
+		return avg > 0 ? avg : fraction(video.path("r_frame_rate").asText(""));
+	}
+
+	private static double fraction(String value) {
+		int slash = value.indexOf('/');
+		try {
+			if (slash < 0) {
+				return value.isEmpty() ? 0 : Double.parseDouble(value);
+			}
+			double den = Double.parseDouble(value.substring(slash + 1));
+			return den == 0 ? 0 : Double.parseDouble(value.substring(0, slash)) / den;
+		} catch (NumberFormatException e) {
+			return 0;
 		}
 	}
 
 	private JsonNode probe(Path file) {
-		List<String> command = List.of(ffprobePath, "-v", "error", "-print_format", "json", "-show_streams", file.toString());
+		List<String> command = List.of(ffprobePath, "-v", "error", "-print_format", "json", "-show_streams", "-show_format", file.toString());
 		try {
 			Process process = new ProcessBuilder(command).redirectErrorStream(false).start();
 			byte[] output = process.getInputStream().readAllBytes();

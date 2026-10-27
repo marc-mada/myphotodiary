@@ -21,6 +21,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.myphotodiary.cms.gallery.dto.ImageResponse;
+import org.myphotodiary.cms.gallery.dto.VideoStatusResponse;
 import org.myphotodiary.cms.gallery.dto.VideoTokenResponse;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.support.ResourceRegion;
@@ -89,7 +91,21 @@ public class VideoController {
 		}
 		Image image = requireVideo(imageId);
 
-		return VideoRangeResponses.serve(storageService.resolveOriginal(image.getDirectory().getPath(), image.getName()), headers);
+		return VideoRangeResponses.serve(storageService.resolvePlayableVideo(image), headers);
+	}
+
+	/**
+	 * Which file plays this video (27/10/2026) - polled by the viewer while
+	 * the playback copy is being made ("Preparing video..."), to reload the
+	 * player once it is ready. Same access as viewing the video.
+	 */
+	@GetMapping("/api/videos/{imageId}/status")
+	public VideoStatusResponse status(Authentication authentication, @PathVariable Long imageId) {
+		Image image = galleryService.requireReadableImage(authentication, imageId);
+		if (image.getMediaType() != org.myphotodiary.cms.gallery.MediaType.VIDEO) {
+			throw new IllegalArgumentException("Not a video: " + imageId);
+		}
+		return new VideoStatusResponse(ImageResponse.videoPlaybackOf(image));
 	}
 
 	private Image requireVideo(Long imageId) {

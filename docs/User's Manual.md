@@ -364,9 +364,23 @@ the picture is gone.
 
 Click **Publish pictures**, above the directory tree, to open this
 popup. Drag pictures and short videos onto the striped area, or click
-**browse** to pick them from a file dialog instead — both photos and
-MP4 (H.264) videos are accepted; there's a maximum video size an
-administrator sets for the whole instance (§8.2).
+**browse** to pick them from a file dialog instead — photos and videos
+are both accepted; there's a maximum video size an administrator sets for
+the whole instance (§8.2).
+
+Videos can be in almost any format: a phone's MP4 or MOV (including
+iPhone "High Efficiency" HEVC), a camcorder's MTS or MPG, an old camera's
+AVI, MKV, WebM… The video appears in the filmstrip right away, with its
+first image as thumbnail. When it isn't in a format every browser can
+play — or is larger than 1080p, faster than 30 images per second, or
+interlaced — myPhotoDiary makes a playback copy in the background (H.264,
+at most 1080p). Until it's ready, a browser that can't play the original
+shows **Preparing video… It will play here as soon as it is ready** in
+place of the video, and starts playing on its own once the copy exists;
+no need to reload the page. A short video takes a few seconds; several
+long ones are converted one after the other. Your original file is always
+kept, unchanged (unless an administrator turned on compaction — §8.2),
+and **Download** still gives you the original.
 
 One checkbox decides where an uploaded file ends up:
 
@@ -735,9 +749,24 @@ Two independent forms:
     first ones are shared, with a warning to the person sharing (§6).
     50 by default.
   - **Allow sharing videos by link** — off by default. When ticked,
-    videos can be shared like pictures (§6). A shared video is the
-    original file, streamed from your server to anyone who has the link
-    for its 30 days — think of your bandwidth before turning it on.
+    videos can be shared like pictures (§6). A shared video is streamed
+    from your server (its playback copy when it has one, otherwise the
+    original) to anyone who has the link for its 30 days — think of your
+    bandwidth before turning it on.
+  - **Compact original videos in old or heavy formats** — off by
+    default. When ticked, an original video in an old or very large
+    format (ProRes, DV from a MiniDV camcorder, MJPEG AVI from an old
+    compact camera, MPEG-2 from a DVD camcorder…) is re-encoded in the
+    background to the modern HEVC format, after its playback copy — often
+    5 to 20 times smaller, with no visible loss, and the backup shrinks
+    accordingly. **This is permanent**: the original file is replaced
+    (an `.avi` becomes an `.mp4`) and the old one can't be recovered, even
+    from the next backup. Phone videos (HEVC, H.264) and HDR videos are
+    never touched. Turning it on also covers videos already stored, the
+    next time their sequence is indexed.
+  - When videos are waiting to be converted, or a conversion failed, a
+    line below says how many. A failed one is tried again the next time
+    its sequence is indexed (Admin → Index management).
 
 Under these two boxes, a line shows the **version of myPhotoDiary
 running on the server** — useful to check that an upgrade really took
@@ -762,9 +791,11 @@ Three independent tools, stacked top to bottom:
   **Check and execute indexing tasks** — it asks for confirmation first,
   then runs every deletion, then every reset, then every (re)index, in
   that order. Indexing also picks up videos copied straight onto the
-  server's disk, as long as they're H.264 (the same format check as an
-  upload); others are skipped, since a browser couldn't play them.
-  Videos already in a sequence are always kept.
+  server's disk, in any format ffmpeg can read (a playback copy is made
+  in the background when needed, as for an upload — §3); only files that
+  aren't readable videos are skipped. Videos already in a sequence are
+  always kept, and indexing repairs them: a missing or failed playback
+  copy is made again.
 - **New directory** — creates an empty sequence at the given
   `year/month/sequence` path, both in the database and as a real folder
   on disk, ready to receive pictures.
@@ -1080,10 +1111,10 @@ sends the selected image files. On a slow mobile connection, photos are
 made smaller automatically before being sent, exactly as on desktop —
 see §3 for how it works and what it means for the stored photo.
 
-   If some files are refused (for example an HEVC video, or a name
-   already used in that sequence), the others are still published. The
-   refused ones stay selected, each listed with the reason; tapping
-   **Upload** again only sends those.
+   If some files are refused (for example a damaged video, one above the
+   maximum video size, or a name already used in that sequence), the
+   others are still published. The refused ones stay selected, each
+   listed with the reason; tapping **Upload** again only sends those.
 
 <figure>
 <img src="images/mobile-publish.jpg" alt="Publish, with the device's own file/gallery picker" width="400">
@@ -1111,9 +1142,10 @@ next).
 
 **Film** — the video equivalent of Camera: tap **Record a video** to
 launch the device's own camera app directly in video-recording mode and
-shoot one video at a time. The same
-`accept="video/mp4"` restriction the upload form always enforces for
-video applies here too (see §3).
+shoot one video at a time, in whatever format the phone records (an
+iPhone's HEVC included — a playback copy is made when needed, see §3).
+The maximum video size applies (§8.2): at phone quality, 20 MB is less
+than a minute of video.
 
 <figure>
 <img src="images/mobile-video.jpeg" alt="Film, launching the device's own camera app in video mode" width="400">

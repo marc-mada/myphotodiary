@@ -63,6 +63,9 @@ public class AppSettingsController {
 		if (request.allowVideoSharing() != null) {
 			service.updateAllowVideoSharing(request.allowVideoSharing());
 		}
+		if (request.compactOriginalVideos() != null) {
+			service.updateCompactOriginalVideos(request.compactOriginalVideos());
+		}
 		return AppSettingsResponse.from(service.get());
 	}
 }

@@ -25,7 +25,9 @@
 # Excludes .thumbnails/ and .webimg/ on purpose - both are regenerable from
 # the originals (Admin -> Index management -> Batch Publish / re-index),
 # so backing them up would burn real disk/network space on the NAS for
-# zero actual data-loss protection.
+# zero actual data-loss protection. That includes the videos' H.264
+# playback copies (.webimg/<name>.mp4, 27/10/2026): a re-index queues them
+# again. .video-work/ holds encodes in progress only.
 #
 # Same mount-guard reasoning as DatabaseBackupService/BackupMountGuard
 # (Java) - reproduced here in shell rather than shared code, since this
@@ -126,6 +128,7 @@ fi
 if ! rsync $RSYNC_OPTS \
 	--exclude='.thumbnails/' \
 	--exclude='.webimg/' \
+	--exclude='.video-work/' \
 	"$STORAGE_ROOT/" "$SNAPSHOT_DIR/"; then
 	fail "rsync failed (see stderr above)"
 fi

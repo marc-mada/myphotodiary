@@ -20,7 +20,7 @@ import { MobilePage } from './MobilePage';
 
 /**
  * `#upload-page` ("Publish pictures" menu entry) - `<input type="file"
- * accept="image/*,video/mp4" multiple>`, no `capture` attribute (mindex.jsp
+ * accept="image/*,video/*" multiple>`, no `capture` attribute (mindex.jsp
  * l.156), so the browser offers its full library picker (gallery/library,
  * camera, files) rather than jumping straight into the camera - both
  * photos and videos (see MobileImportForm's own comment on why `accept`

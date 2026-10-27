@@ -20,6 +20,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.myphotodiary.cms.gallery.Image;
+import org.myphotodiary.cms.gallery.MediaType;
+import org.myphotodiary.cms.gallery.VideoPlayback;
 
 public record ImageResponse(
 		Long id,
@@ -48,7 +50,17 @@ public record ImageResponse(
 		Double longitude,
 		// The picture's sequence path ("" for the root, 19/10/2026) - shown
 		// and pre-filled by the Rename / Move form (ImageEditForm).
-		String directoryPath) {
+		String directoryPath,
+		/** Which file plays a video - ORIGINAL, PENDING, COPY or FAILED (27/10/2026); {@code null} for a picture. */
+		String videoPlayback) {
+
+	/** {@code null} for a picture; a video stored before V19 (no state) plays its original. */
+	public static String videoPlaybackOf(Image image) {
+		if (image.getMediaType() != MediaType.VIDEO) {
+			return null;
+		}
+		return image.getVideoPlayback() == null ? VideoPlayback.ORIGINAL.name() : image.getVideoPlayback().name();
+	}
 
 	public static ImageResponse from(Image image) {
 		String base = "/api/images/" + image.getId();
@@ -82,6 +94,7 @@ public record ImageResponse(
 				image.getDirectory().getId(),
 				image.getLatitude(),
 				image.getLongitude(),
-				image.getDirectory().getPath());
+				image.getDirectory().getPath(),
+				videoPlaybackOf(image));
 	}
 }

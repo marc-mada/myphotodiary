@@ -25,4 +25,6 @@ import { apiFetch } from './client';
  */
 export const videoApi = {
 	getToken: (imageId) => apiFetch(`/api/videos/${imageId}/token`),
+	// 27/10/2026 - which file plays: ORIGINAL, PENDING (copy being made), COPY, FAILED.
+	getStatus: (imageId) => apiFetch(`/api/videos/${imageId}/status`),
 };

@@ -4,3 +4,8 @@ spring:
     username: sa
     password:
     driver-class-name: org.hsqldb.jdbc.JDBCDriver
+app:
+  video:
+    # No background transcoding workers in tests - the tests run jobs
+    # themselves (VideoJobRunner.runNextJob), in a known order.
+    transcode-workers: 0

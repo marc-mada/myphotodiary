@@ -97,9 +97,11 @@ deliberate future cleanup, not done as a side effect of the auth change.
 
 **External process dependency (not a Maven artifact)**: `ffmpeg`/`ffprobe`
 must be installed and on `PATH` (or pointed at via
-`MPD_FFMPEG_PATH`/`MPD_FFPROBE_PATH`) — used only for video (first-frame
-thumbnail extraction, codec validation). No server-side transcoding
-happens anywhere.
+`MPD_FFMPEG_PATH`/`MPD_FFPROBE_PATH`) — used only for video: `ffprobe`
+probes every uploaded video, `ffmpeg` extracts its first-frame thumbnail
+and, in the background, makes the H.264 playback copy (`libx264`) and,
+when turned on, compacts old-format originals to HEVC (`libx265`) — see
+§8. Ubuntu's and Homebrew's ffmpeg packages include both encoders.
 
 ### Frontend (`frontend/package.json`)
 
@@ -181,7 +183,19 @@ erDiagram
         varchar media_type "IMAGE/VIDEO, default IMAGE"
         double latitude "from EXIF GPS at index/import time (V12), null if the photo has none, never user-editable"
         double longitude "from EXIF GPS at index/import time (V12), null if the photo has none, never user-editable"
+        varchar video_playback "V19, ORIGINAL/PENDING/COPY/FAILED, null for a picture"
         bigint directory_id FK
+    }
+    video_job {
+        bigint id PK
+        bigint image_id FK "ON DELETE CASCADE"
+        varchar stage "PLAYBACK_COPY or COMPACT_ORIGINAL"
+        int priority "0 copy, 1 compaction"
+        varchar state "PENDING/RUNNING/FAILED, deleted when done"
+        int attempts "max 3"
+        varchar last_error
+        timestamp created_at
+        timestamp updated_at
     }
     attribute {
         bigint id PK
@@ -202,6 +216,7 @@ erDiagram
         int target_upload_seconds "V13, default 10"
         int max_share_size "V14, default 50"
         boolean allow_video_sharing "V15, default false"
+        boolean compact_original_videos "V19, default false"
     }
 ```
 
@@ -227,6 +242,7 @@ erDiagram
 | V16 | `merged_sequence`, `merged_sequence_image` | A merged-away sequence's own pictures, so its share links keep showing exactly those (`SequenceShareResolver`) |
 | V17 | `app_user.presentation` | Desktop presentation per user (`dark` default) |
 | V18 | `app_user.online_capture` | Mobile Camera/Film menu entries per user (off by default) |
+| V19 | `image.video_playback`, `video_job`, `app_settings.compact_original_videos` | Any video format accepted: background H.264 playback copies, optional compaction of old-format originals (§8) |
 
 Every migration after V2/V3 deliberately adds only the column(s) the
 screen actually being built needs at that moment — a running principle
@@ -335,7 +351,8 @@ classes:
 | `PathUtil` | Path-traversal-safe resolution under a storage root (`resolveUnderRoot`) — the fix for the legacy path-traversal vulnerability, ported forward |
 | `ExifDateReader`, `PathDateGuesser`, `DirectoryDateRules` | Faithful ports of the legacy EXIF/filename/path date-inference chain |
 | `AttributeService` | Hierarchical tag CRUD — assigning a child auto-includes ancestors; deleting a tag reparents its children rather than cascading |
-| `VideoFormatValidator`, `VideoThumbnailExtractor`, `VideoStreamTokenService` | Video-specific: strict H.264/AAC validation via `ffprobe`, first-frame extraction via `ffmpeg`, HMAC-signed streaming tokens |
+| `VideoFormatValidator`, `VideoThumbnailExtractor`, `VideoStreamTokenService` | Video-specific: `ffprobe` probe returning a `VideoInfo` (codec, size, frame rate, interlacing, HDR — refuses only an unreadable file), first-frame extraction via `ffmpeg`, HMAC-signed streaming tokens |
+| `VideoProcessingService`, `VideoJobRunner`, `VideoTranscoder`, `VideoJobSignal` | Background video processing (§8): decides whether a video needs a playback copy, the `video_job` queue (claim, finish, retry, repair on re-index), the worker threads, the two ffmpeg encodes |
 | `MediaType` | `IMAGE`/`VIDEO` discriminator on the `image` table — no parallel `Video` entity, so every existing feature (tags, search, RBAC, rating) works unmodified for video |
 | `ShareTokenService` | HMAC-signed, stateless, 30-day external share tokens — `IMAGE`/`SEQUENCE` scope + target id in the payload, own secret from `VideoStreamTokenService`'s; no DB row, no schema change |
 | `ShareController` | Issues share tokens (authenticated, RBAC-checked) and serves the `permitAll()` `/api/public/**` read surface they unlock |
@@ -412,7 +429,9 @@ means "any authenticated role."
 | GET | `/api/attributes` / `/api/attribute-tree` | any | List tags, lazy tree |
 | POST/PATCH/DELETE | `/api/attributes[/{id}]` | ADMIN | Tag CRUD, including reparenting |
 | GET | `/api/videos/{imageId}/token` | any | Issue a short-lived video streaming token |
-| GET | `/api/videos/{imageId}/stream` | **public** | Range-request video streaming, validated by its own signed token, not Spring Security |
+| GET | `/api/videos/{imageId}/stream` | **public** | Range-request video streaming, validated by its own signed token, not Spring Security — serves the H.264 playback copy once made, else the original |
+| GET | `/api/videos/{imageId}/status` | any (read access to the video) | `{videoPlayback}` — polled by the player while the copy is being made |
+| GET | `/api/admin/video-jobs` | ADMIN | `{pending, running, failed}` background video jobs (Admin → Configure) |
 | POST | `/api/images/{imageId}/move` | RBAC `EDIT_IMAGE` (+ `EDIT_SEQUENCE` on the target when the sequence changes) | Rename and/or move one picture or video (`{newName, targetPath}`, either null to keep): files and `.thumbnails`/`.webimg` move, row keeps its id; same extension required; name taken in the target → 409, never suffixed; unindexed target folder is indexed first; files moved back if the DB update fails |
 | POST | `/api/images/{imageId}/rotate` | RBAC `EDIT_IMAGE` | Rotate original/web/thumbnail 90° × `quarterTurns` (optional, 1..3, default 1) right in place, one re-encode (rejects video) |
 | GET | `/api/images/{imageId}/share-token` | any | Issue a 30-day, IMAGE-scoped external share token |
@@ -525,27 +544,68 @@ baked into the output pixels at thumbnail-generation time (Thumbnailator),
 so — unlike the legacy `Image.orientation` column — there's nothing to
 persist for it at all.
 
-**Video format — deliberately strict, one format only**: **MP4
-container, H.264 video codec, AAC audio (or no audio track)**. Enforced
-by actually probing the codec via `ffprobe` (`VideoFormatValidator`), not
-just trusting the `.mp4` extension — a phone recording in "High
-Efficiency" mode can produce HEVC inside a `.mp4` container, which this
-rejects with an explicit message rather than silently failing to play in
-Safari. **No server-side transcoding** — what's uploaded must already be
-playable by a plain HTML5 `<video>` tag everywhere. Detected purely by
-`.mp4` extension at upload time (`ImportService.VIDEO_EXTENSIONS`) before
-the codec-level check runs.
+**Video formats — any video ffmpeg can read** (since 27/10/2026, "option
+C"; until then strictly H.264 + AAC in MP4, nothing transcoded). Routed
+to the video path by extension (`ImportService.VIDEO_EXTENSIONS`: mp4,
+mov, m4v, 3gp, mts, m2ts, mpg, mpeg, vob, dv, avi, wmv, mkv, webm), then
+probed with `ffprobe` (`VideoFormatValidator` → `VideoInfo`); only a file
+with no readable video stream is refused. The original is always kept as
+uploaded. What plays in the browser (`VideoProcessingService`,
+`image.video_playback`):
+
+1. **During the request, synchronously** (well under a second): probe,
+   then first-frame thumbnail — the video appears in the filmstrip at once.
+   An original already playable everywhere (`VideoInfo.playableAsIs()`:
+   H.264 8-bit 4:2:0 in MP4/MOV, AAC or no sound, at most 1920×1080 either
+   orientation, at most 30 fps and 8 Mbit/s, progressive, not HDR) is
+   `ORIGINAL` and streamed as is — every video stored before V19 is in
+   this case (a `null` state means `ORIGINAL`).
+2. **Background queue, priority 0**: any other gets `PENDING` and a
+   `PLAYBACK_COPY` job — H.264 (`libx264`, CRF 23, capped at 6 Mbit/s) +
+   AAC stereo 128 kbit/s in MP4 with `faststart`, fitted inside 1920×1080
+   (never upscaled), at most 30 fps, deinterlaced (`bwdif`, one frame per
+   frame), HDR tone-mapped to SDR when ffmpeg has `zscale`. Stored as
+   `.webimg/<name>.mp4`; state becomes `COPY`. Until then the original is
+   streamed; a browser that can't play it (error, or sound without
+   picture) shows "Preparing video…" and polls
+   `/api/videos/{id}/status` every 5 s, reloading once the copy exists.
+3. **Background queue, priority 1**, only when the app-wide setting
+   "Compact original videos" is on (off by default), only for an
+   inefficient codec (ProRes, DV, MJPEG, MPEG-1/2, MPEG-4 Part 2, WMV…),
+   never for HDR, queued only when that video's copy is done: the
+   original is re-encoded to HEVC (`libx265`, CRF 24, tagged `hvc1`,
+   fitted inside 3840×2160, at most 60 fps, 10 bits kept for a 10-bit
+   source, metadata copied) and replaces the original only if smaller —
+   a new container renames the file (`clip.avi` → `clip.mp4`, or
+   `clip-1.mp4` if taken), its thumbnail and copy follow.
+
+Every waiting copy runs before any compaction, so a batch becomes
+playable first. Workers: `app.video.transcode-workers`
+(`MPD_VIDEO_TRANSCODE_WORKERS`, default 1, 0 = off), ffmpeg run under
+`nice`. Encodes are written to `<storage root>/.video-work/` and moved
+into place at the end, so a half-written file is never visible. A job
+holds the video id, never its path: renamed/moved meanwhile, the job runs
+again on the new path; deleted, the job goes with it (`ON DELETE
+CASCADE`). A failed job is retried up to 3 times, then `FAILED` (counted
+in Admin → Configure); jobs left running by a stop are put back at
+start-up. A re-index repairs everything: missing copy, failed job, a
+video stored before V19 (probed once), compaction for an existing video
+once the setting is on.
 
 **Derivatives generated per file**:
 
 | Tier | Photos | Videos |
 |---|---|---|
 | Thumbnail (128px) | Thumbnailator, from the original | `ffmpeg -vframes 1` first-frame extraction, then the same Thumbnailator resize |
-| "Web" (1600px) | Thumbnailator | *(none — the player streams the original directly, Range-request)* |
+| "Web" (1600px) | Thumbnailator | H.264 playback copy `.webimg/<name>.mp4`, only when the original isn't playable everywhere (see above); streamed with Range requests, like the original otherwise |
 | Original | stored as uploaded | stored as uploaded |
 
 Size cap: `app_settings.max_video_size_bytes`, admin-editable at runtime
-(Admin → Configure), default 20MB (V11). No equivalent cap on photos.
+(Admin → Configure), default 20MB (V11) — browser uploads only; Batch
+Publish and indexing of files already on the server have no cap. No
+equivalent cap on photos. The image backup (`backup-images.sh`) skips
+`.webimg/`, so playback copies aren't backed up: a re-index queues them
+again.
 
 **Fallback chain for photo derivatives** (`ImageStorageService`, 02/09/2026):
 a request for a missing derivative file falls back rather than failing —
@@ -654,7 +714,7 @@ Adding a presentation = one CSS block + one id in
   vestigial once this shipped).
 - Direct filesystem drop + (re)indexing, still a first-class supported
   workflow, not just the browser path.
-- Photo *and* video upload (strict MP4/H.264, see §8).
+- Photo *and* video upload (any video ffmpeg can read, H.264 playback copy when needed, see §8).
 - Thumbnails, a medium "web" resolution tier, full-original download/export.
 - Post-it style comments at both directory and image level; star rating
   (4 levels, matching legacy `NOT_RATED`..`VERY_GOOD`).
@@ -743,13 +803,17 @@ Adding a presentation = one CSS block + one id in
 **Admin** (desktop only, ADMIN role only)
 - User/group/role-assignment CRUD, hand-built table component.
 - Per-user settings editable for *any* user, not just self.
-- App-wide settings (video size cap).
+- App-wide settings (video size cap, compaction of old-format originals, waiting/failed video jobs).
 - Bulk directory index/reset/delete operations, recursive "Batch Publish."
 - Tag tree management.
 - Backup (18/09/2026) - see the dedicated "Backup" bullet below.
 
 **Video**
-- Strict MP4/H.264(+AAC) upload validation, first-frame thumbnail.
+- Any format ffmpeg can read (phones' HEVC, camcorders' AVCHD/DV/MPEG-2,
+  old cameras' MJPEG AVI…), probed at upload, first-frame thumbnail at
+  once; H.264 playback copy (≤1080p, ≤30 fps) made in the background when
+  needed, "Preparing video…" meanwhile; optional HEVC compaction of
+  old-format originals (§8).
 - Token-authenticated Range-request streaming (seekable, no full-file
   download).
 
@@ -862,7 +926,7 @@ for the full rationale)
 
 ## 11. Testing
 
-196 backend tests (JUnit 5 + `@SpringBootTest`, real HSQLDB in-memory per
+298 backend tests (JUnit 5 + `@SpringBootTest`, real HSQLDB in-memory per
 test class — `DatabaseBackupServiceTest` is the one deliberate exception,
 built against a real *file-mode* HSQLDB it constructs by hand, since
 `BACKUP DATABASE` is a documented no-op against an in-memory catalog; see
@@ -895,12 +959,31 @@ calls: login sets a real session cookie a follow-up request can use with
 *no* other credentials, a wrong password issues no cookie at all, a
 mutating request is rejected without the CSRF header and accepted with
 it, and logout genuinely invalidates the session rather than just
-clearing client-side state).
+clearing client-side state), and background video processing
+(27/10/2026, `VideoTranscodingTest` — real ffmpeg encodes on committed
+data, jobs run one by one by the test: a non-H.264 original gets a
+playable H.264 copy, a portrait 1440×2560 60 fps H.264 gets a 1080×1920
+≤30 fps copy, a missing copy is queued again by a re-index, an unreadable
+original fails after 3 attempts, and with compaction on every copy runs
+before any compaction and an MJPEG AVI becomes a smaller HEVC `.mp4`
+whose thumbnail and copy follow the new name).
 No frontend automated test suite yet — frontend changes have instead been
 verified through direct, real-browser (Playwright/Chromium) checks against
 running dev instances, slice by slice.
 
 ## 12. Known limitations / not yet built
+
+- **Background video processing (27/10/2026, §8)** — costs CPU and disk:
+  an H.264 copy is usually about the size of a 1080p HEVC original
+  (bigger at equal quality), smaller than a 4K one; on a 12-core server
+  a copy takes roughly real time or less, an HEVC compaction 1–3× real
+  time. HDR (iPhone Dolby Vision/HLG) copies are tone-mapped only when
+  ffmpeg has the `zscale` filter (Ubuntu's has it, Homebrew's doesn't —
+  otherwise the colours look flat); HDR originals are never compacted.
+  Playback copies aren't backed up (`.webimg/` is skipped): restoring the
+  image tree and re-indexing queues them again. The shared viewer shows
+  "being prepared" but doesn't poll. The date recorded inside a video
+  file is still not read.
 
 - **Share to myPhotoDiary (21/10/2026)** — Web Share Target
   (`manifest.json`'s `share_target`, POST `/share-receive`), received by

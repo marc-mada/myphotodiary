@@ -76,6 +76,25 @@ see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Release Notes
 
+### 2.13.0 — 2026-10-27
+
+- **Videos in (almost) any format**: iPhone "High Efficiency" (HEVC),
+  camcorder MTS/MPG/DV, old cameras' AVI, MKV, WebM… are now accepted.
+  The original is kept as is; when not every browser can play it, an
+  H.264 playback copy (at most 1080p, 30 images/second) is made in the
+  background — "Preparing video…" is shown meanwhile, and the video starts
+  on its own once ready. Thumbnails still appear at once.
+- New app-wide setting (Admin → Configure, off by default): **compact
+  original videos** in old or heavy formats (ProRes, DV, MJPEG, MPEG-2…)
+  to HEVC — often 5 to 20 times smaller. Permanent: the original file is
+  replaced. Admin → Configure also shows how many videos are waiting for,
+  or failed, conversion.
+- Batch Publish no longer applies the maximum video size (it only limits
+  browser uploads).
+- New optional setting `MPD_VIDEO_TRANSCODE_WORKERS` (default 1). The
+  database is upgraded automatically (V19). Videos stored before keep
+  playing as before.
+
 ### 2.12.0 — 2026-10-26
 
 - Mobile: the menu's **Camera** and **Film** entries are now hidden by

@@ -197,7 +197,10 @@
     "maxShareSize": "Nombre maximum de photos dans un résultat de recherche partagé",
     "allowVideoSharing": "Autoriser le partage des vidéos par lien (diffusées depuis ce serveur à toute personne ayant le lien)",
     "presentation": "Présentation (ordinateur)",
-    "onlineCapture": "Capture en ligne (mobile : Photographier et Filmer dans le menu)"
+    "onlineCapture": "Capture en ligne (mobile : Photographier et Filmer dans le menu)",
+    "compactOriginalVideos": "Compacter les vidéos originales aux formats anciens ou lourds (réencodage en HEVC)",
+    "compactOriginalVideosHint": "ProRes, DV, MJPEG, MPEG-2, AVI… sont réencodés en arrière-plan après leur copie de lecture. Définitif : le fichier original est remplacé par un fichier plus petit.",
+    "videoJobs": "Vidéos en attente de traitement : {{waiting}}. En échec : {{failed}}."
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "nouveau/chemin/de/répertoire",
@@ -316,5 +319,10 @@
     "old-rose": "Galerie vieux rose",
     "deep-blue": "Galerie bleu profond",
     "lagoon": "Galerie lagon"
+  },
+  "video": {
+    "preparing": "Préparation de la vidéo… Elle sera lue ici dès qu’elle sera prête.",
+    "preparingShared": "Cette vidéo est encore en préparation. Réessayez dans quelques minutes.",
+    "unavailable": "Cette vidéo ne peut pas être lue dans ce navigateur."
   }
 }

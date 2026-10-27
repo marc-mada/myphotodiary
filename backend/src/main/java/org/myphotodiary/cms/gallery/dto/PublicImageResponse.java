@@ -42,7 +42,9 @@ public record PublicImageResponse(
 		/** Public stream of a shared video (14/10/2026) - {@code null} for a picture. */
 		String streamUrl,
 		/** The picture's own sequence comment - only filled for a shared search result, whose pictures come from different sequences (04/10/2026); {@code null} otherwise. */
-		String sequenceDescription) {
+		String sequenceDescription,
+		/** See {@link ImageResponse#videoPlayback()} - lets the shared viewer say "being prepared" rather than "can't play". */
+		String videoPlayback) {
 
 	public static PublicImageResponse from(Image image, String token) {
 		return from(image, token, false);
@@ -60,6 +62,7 @@ public record PublicImageResponse(
 				base + "/thumbnail" + suffix,
 				base + "/web" + suffix,
 				image.getMediaType() == org.myphotodiary.cms.gallery.MediaType.VIDEO ? base + "/stream" + suffix : null,
-				withSequenceDescription ? image.getDirectory().getDescription() : null);
+				withSequenceDescription ? image.getDirectory().getDescription() : null,
+				ImageResponse.videoPlaybackOf(image));
 	}
 }

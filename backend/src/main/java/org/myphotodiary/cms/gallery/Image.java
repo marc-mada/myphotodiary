@@ -79,6 +79,11 @@ public class Image {
 	private Double latitude;
 	private Double longitude;
 
+	/** V19 - which file plays a video ({@code null} for a picture, or a video stored before V19: the original). */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "video_playback")
+	private VideoPlayback videoPlayback;
+
 	@ManyToOne(optional = false)
 	@JoinColumn(name = "directory_id")
 	private Directory directory;
@@ -165,6 +170,14 @@ public class Image {
 	public void moveTo(Directory directory, String name) {
 		this.directory = directory;
 		this.name = name;
+	}
+
+	public VideoPlayback getVideoPlayback() {
+		return videoPlayback;
+	}
+
+	public void setVideoPlayback(VideoPlayback videoPlayback) {
+		this.videoPlayback = videoPlayback;
 	}
 
 	public Directory getDirectory() {

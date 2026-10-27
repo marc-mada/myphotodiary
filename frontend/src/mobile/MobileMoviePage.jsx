@@ -27,8 +27,9 @@ import { MobilePage } from './MobilePage';
  * launch entirely) made clear that photo capture and video capture can't
  * safely share one `<input>` - each media type needs its own unambiguous
  * `accept` for `capture` to reliably launch the right native capture UI.
- * `accept="video/mp4"` alone (matching this project's own MP4-only policy,
- * `VideoFormatValidator`) + `capture="environment"` is the video-only
+ * `accept="video/mp4"` alone (the MP4-only policy of the time - any video
+ * is accepted since 27/10/2026, but this attribute only steers the picker,
+ * and a phone records in its own format regardless) + `capture="environment"` is the video-only
  * mirror of `MobileCameraPage`'s own photo-only pair - not verified in the
  * same way that pair now has been (a device wasn't available to confirm
  * this one actually launches video-recording mode rather than yet another

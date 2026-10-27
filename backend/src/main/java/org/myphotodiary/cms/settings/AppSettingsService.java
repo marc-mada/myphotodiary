@@ -86,6 +86,20 @@ public class AppSettingsService {
 		return settings;
 	}
 
+	/**
+	 * "Compact original videos" (27/10/2026, V19, off by default): when on,
+	 * an original in an inefficient codec (ProRes, DV, MJPEG, MPEG-2...) is
+	 * re-encoded to HEVC in the background after its playback copy - a
+	 * permanent, lossy change to the original (and so to the backup), hence
+	 * off unless chosen. See VideoProcessingService.
+	 */
+	@Transactional
+	public AppSettings updateCompactOriginalVideos(boolean compactOriginalVideos) {
+		AppSettings settings = get();
+		settings.setCompactOriginalVideos(compactOriginalVideos);
+		return settings;
+	}
+
 	public static final int MIN_MAX_SHARE_SIZE = 1;
 	public static final int MAX_MAX_SHARE_SIZE = 1000;
 

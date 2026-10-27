@@ -40,6 +40,13 @@
             "image/heif",
             "video/mp4",
             "video/quicktime",
+            "video/x-m4v",
+            "video/3gpp",
+            "video/x-msvideo",
+            "video/x-matroska",
+            "video/webm",
+            "video/mp2t",
+            "video/mpeg",
             ".jpg",
             ".jpeg",
             ".png",
@@ -47,7 +54,15 @@
             ".webp",
             ".heic",
             ".mp4",
-            ".mov"
+            ".mov",
+            ".m4v",
+            ".3gp",
+            ".avi",
+            ".mkv",
+            ".webm",
+            ".mts",
+            ".m2ts",
+            ".mpg"
           ]
         }
       ]

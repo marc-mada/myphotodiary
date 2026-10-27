@@ -143,14 +143,12 @@ export function Uploader({ currentDirectoryPath, onImported }) {
 				allowMultiple
 				// image/*, not a fixed jpg/png list - photos already accept
 				// several formats server-side (ImageStorageService's own
-				// IMAGE_EXTENSIONS); video/mp4 specifically, not video/* -
-				// this is a client-side courtesy filter only (the real,
-				// codec-level check is VideoFormatValidator, server-side,
-				// unavoidably - see its own javadoc for why the extension/
-				// declared type alone can't be trusted), but no reason to
-				// invite an obviously-wrong pick (.mov, .avi) through the file
-				// browser just to reject it a moment later.
-				acceptedFileTypes={['image/*', 'video/mp4']}
+				// IMAGE_EXTENSIONS). video/* since 27/10/2026 (was video/mp4):
+				// any video ffmpeg can read is accepted now, an H.264 copy
+				// being made in the background when needed. Only the browse
+				// dialog's filter - the real check is server-side
+				// (VideoFormatValidator).
+				acceptedFileTypes={['image/*', 'video/*']}
 				server={server}
 				labelIdle={t('upload.dropHere', { browseAction: `<span class="filepond--label-action">${t('upload.browse')}</span>` })}
 			/>

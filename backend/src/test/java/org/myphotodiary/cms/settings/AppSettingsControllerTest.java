@@ -78,4 +78,12 @@ class AppSettingsControllerTest {
 		assertThat(controller.update(new UpdateAppSettingsRequest(null, null, null, false)).allowVideoSharing()).isFalse();
 	}
 
+	@Test
+	@org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
+	void compactOriginalVideos_isOffByDefault_andCanBeTurnedOn() {
+		assertThat(controller.get().compactOriginalVideos()).isFalse();
+		assertThat(controller.update(new UpdateAppSettingsRequest(null, null, null, null, true)).compactOriginalVideos()).isTrue();
+		assertThat(controller.update(new UpdateAppSettingsRequest(null, null, null, null, false)).compactOriginalVideos()).isFalse();
+	}
+
 }

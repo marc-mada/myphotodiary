@@ -65,10 +65,17 @@ instead — it covers actually using the application.
   install this yourself — the backend package depends on
   `openjdk-21-jre-headless` and `apt` installs it automatically (the
   Docker image includes it).
-- **`ffmpeg`**: required for video upload support (extracting a preview
-  thumbnail and validating the video's codec — no video is ever
-  transcoded). Also installed automatically as a package dependency, and
-  included in the Docker image.
+- **`ffmpeg`**: required for video support — reading each video,
+  extracting its preview thumbnail, and, in the background, converting a
+  video browsers can't all play (iPhone HEVC, camcorder AVCHD/DV/MPEG-2,
+  old AVI…) into an H.264 playback copy (and, if turned on, compacting
+  old-format originals to HEVC). Needs the `libx264` and `libx265`
+  encoders, which the Ubuntu/Debian package has. Also installed
+  automatically as a package dependency, and included in the Docker image.
+- **CPU**: converting a video takes roughly its own duration or less on
+  a recent multi-core server, more on a small one (a Raspberry Pi is
+  noticeably slow). It runs in the background, one video at a time, at
+  low priority, so browsing stays responsive.
 - **A web server**: Caddy, to serve the frontend and expose the backend
   over HTTPS (§4). Not needed with the Docker image, which has its own.
 - **A hostname** pointing to the server public IP address, and ports 80/443 reachable from
@@ -78,8 +85,9 @@ instead — it covers actually using the application.
 - **Disk space**: proportional to the size of the photo/video library
   you intend to store. Besides the originals, the backend generates and
   keeps a thumbnail and a medium ("web") resolution derivative for every
-  picture, and a thumbnail for every video — budget noticeably more than
-  the raw size of your originals alone.
+  picture, a thumbnail for every video, and an H.264 playback copy for a
+  video browsers can't all play (about the size of a 1080p original) —
+  budget noticeably more than the raw size of your originals alone.
 - **On users' own devices**: any modern browser. A couple of desktop-only
   features (e.g. choosing a download folder for original pictures from
   the Search screen) need a Chromium-based browser (Chrome/Edge) and a
@@ -352,6 +360,7 @@ These are the variables `myphotodiary-backend.env` contains:
 | `MPD_PUBLIC_BASE_URL` | *(empty — required behind the web server)* | The absolute `scheme://host` this server is publicly reachable at, e.g. `https://myphotodiary.example.com` (no trailing slash) — the same hostname from §4.2's vhost. Used to build the `og:image` tag on a share link's own preview page (what a messaging app shows before the link is opened) — unlike every other URL this app builds, that one has to be generated on the *server* side, where there's normally no reliable way to know the public-facing address behind the web server |
 | `MPD_FFMPEG_PATH` | *(commented out — `ffmpeg` resolved from `PATH`)* | Full path to the `ffmpeg` binary, only needed if it isn't already on this service's own `PATH` (rarely the case, since it's a package dependency) |
 | `MPD_FFPROBE_PATH` | *(commented out — `ffprobe` resolved from `PATH`)* | Same as above, for `ffprobe` |
+| `MPD_VIDEO_TRANSCODE_WORKERS` | *(commented out — `1`)* | How many videos are converted at the same time in the background. Each conversion already uses every processor core, so 1 suits most servers, 2 at most on a large one; `0` turns background conversion off (videos then only play where the browser supports their format) |
 | `SERVER_PORT` | `8090` | The loopback port the backend listens on — never meant to be exposed directly; the web server (§4) is what's actually reachable from outside |
 
 `MPD_DB_PATH`, `MPD_STORAGE_ROOT`, and `MPD_STAGING_ROOT` all default to
@@ -1021,9 +1030,16 @@ fix:
   `ffprobe -version` work for the service (installed as package
   dependencies; set `MPD_FFMPEG_PATH`/`MPD_FFPROBE_PATH` if they live
   somewhere unusual). A video is also refused, on purpose, if it's larger
-  than the maximum set in Admin → Configure or isn't H.264 (for example
-  an iPhone's "High Efficiency" HEVC recording) — the error message says
-  which.
+  than the maximum set in Admin → Configure, or isn't a readable video —
+  the error message says which.
+- **A video stays on "Preparing video…".** Its playback copy hasn't been
+  made yet. Admin → Configure shows how many videos are waiting or
+  failed. Check the backend's log (`journalctl -u myphotodiary-backend`,
+  or `docker logs`) for lines from `VideoJobRunner`; a failure names the
+  file and ffmpeg's message. Check that `ffmpeg -encoders` lists
+  `libx264` (and `libx265` for compaction), and that
+  `MPD_VIDEO_TRANSCODE_WORKERS` isn't `0`. A failed conversion is tried
+  again when its sequence is indexed (Admin → Index management).
 - **Shared links end on a "Not Found" page.** The `/share/` route is
   missing from your Caddyfile (§4.2): add it, then
   `sudo systemctl reload caddy`.
@@ -1113,6 +1129,7 @@ sets the marker file and secrets file itself.
 | `MPD_PUBLIC_BASE_URL` | *(empty)* | The absolute `scheme://host` this server is publicly reachable at (§5.3, §4.2's own hostname). Left unset, a shared link's preview card falls back to reconstructing an address from the request the web server forwards — normally the wrong scheme |
 | `MPD_FFMPEG_PATH` | *(unset — `ffmpeg` resolved from `PATH`)* | Full path to the `ffmpeg` binary. Only needed if it isn't already on this service's own `PATH` — rarely the case, since `ffmpeg` is a package dependency (§2) |
 | `MPD_FFPROBE_PATH` | *(unset — `ffprobe` resolved from `PATH`)* | Same as above, for `ffprobe` |
+| `MPD_VIDEO_TRANSCODE_WORKERS` | `1` | Videos converted at the same time in the background (§2). 1 suits most servers, 2 at most; `0` turns background conversion off |
 | `SERVER_PORT` | `8090` | The loopback port the backend listens on. Not meant to be reachable from outside — the web server (§4) is what's actually exposed; the firewall table in §4.4 assumes this default |
 | `MPD_BACKUP_ROOT` | *(unset)* | The mounted backup target (§9.1). Both backup halves refuse to write anything at all until this is set |
 | `MPD_BACKUP_ENABLED` | `true` | Set to `false` to disable the in-process database backup entirely |

@@ -17,7 +17,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AuthImage } from './AuthImage';
-import { AuthVideo } from './AuthVideo';
+import { AuthVideo, PublicVideo } from './AuthVideo';
 import { PostIt } from './PostIt';
 import { ProgressiveImage } from './ProgressiveImage';
 
@@ -71,9 +71,9 @@ function MediaLayer({ item, onReady, ImageComponent, progressive, hd = false }) 
 		// A shared video (share-link viewer, 14/10/2026) already carries its
 		// public stream URL; a signed-in one asks for a stream token first.
 		if (item.streamUrl) {
-			return <video src={item.streamUrl} controls className="visible-image" onLoadedMetadata={onReady} />;
+			return <PublicVideo src={item.streamUrl} playback={item.videoPlayback} className="visible-image" onLoadedMetadata={onReady} />;
 		}
-		return <AuthVideo imageId={item.id} className="visible-image" onLoadedMetadata={onReady} />;
+		return <AuthVideo imageId={item.id} playback={item.videoPlayback} className="visible-image" onLoadedMetadata={onReady} />;
 	}
 	const src = hd && item.originalUrl ? item.originalUrl : item.webUrl;
 	if (progressive) {

@@ -77,6 +77,8 @@ class VideoImportTest {
 	private UserService userService;
 	@Autowired
 	private AppSettingsService appSettingsService;
+	@Autowired
+	private VideoJobRepository videoJobRepository;
 
 	private Authentication auth;
 
@@ -113,6 +115,9 @@ class VideoImportTest {
 		// image, not merely a non-empty one.
 		assertThat(javax.imageio.ImageIO.read(thumbnail.toFile())).isNotNull();
 		assertThat(imageRepository.findById(result.image().id())).isPresent();
+		// Small H.264 + AAC MP4: every browser plays it as is - no copy queued.
+		assertThat(result.image().videoPlayback()).isEqualTo("ORIGINAL");
+		assertThat(videoJobRepository.findByImageId(result.image().id())).isEmpty();
 	}
 
 	/**
@@ -135,28 +140,31 @@ class VideoImportTest {
 	}
 
 	/**
-	 * 17/10/2026: a video dropped straight on disk is indexed like a picture
-	 * (if playable: H.264), and counted in the tree; a non-H.264 one is
-	 * skipped, not indexed as something nobody could play.
+	 * 17/10/2026: a video dropped straight on disk is indexed like a picture,
+	 * and counted in the tree. Since 27/10/2026 a non-H.264 one is indexed
+	 * too, with a playback copy queued; only an unreadable file is skipped.
 	 */
 	@Test
 	void indexingADirectory_picksUpPlayableVideosDroppedOnDisk_andCountsThemInTheTree() throws IOException {
 		Path folder = storageRoot.resolve("dropped-videos").resolve("seq");
 		Files.createDirectories(folder);
 		Files.write(folder.resolve("good.mp4"), h264Mp4File("good.mp4").getBytes());
-		Files.write(folder.resolve("bad.mp4"), mpeg4Mp4File("bad.mp4").getBytes());
+		Files.write(folder.resolve("old-codec.mp4"), mpeg4Mp4File("old-codec.mp4").getBytes());
+		Files.write(folder.resolve("broken.mp4"), "not a video".getBytes());
 
 		assertThat(indexerService.listSubdirectories("dropped-videos")).singleElement()
-				.satisfies(node -> assertThat(node.imageCount()).isEqualTo(2)); // both files are counted
+				.satisfies(node -> assertThat(node.imageCount()).isEqualTo(3)); // every file is counted
 
 		var result = indexerService.indexDirectory("dropped-videos/seq", null);
 
-		assertThat(imageRepository.findByDirectory_IdOrderByNameAsc(result.id())).singleElement().satisfies(img -> {
-			assertThat(img.getName()).isEqualTo("good.mp4");
-			assertThat(img.getMediaType()).isEqualTo(MediaType.VIDEO);
-		});
+		assertThat(imageRepository.findByDirectory_IdOrderByNameAsc(result.id()))
+				.extracting(Image::getName, Image::getVideoPlayback)
+				.containsExactlyInAnyOrder(
+						org.assertj.core.groups.Tuple.tuple("good.mp4", VideoPlayback.ORIGINAL),
+						org.assertj.core.groups.Tuple.tuple("old-codec.mp4", VideoPlayback.PENDING));
 		assertThat(Files.exists(folder.resolve(".thumbnails").resolve("good.mp4.jpg"))).isTrue();
-		assertThat(Files.exists(folder.resolve("bad.mp4"))).isTrue(); // skipped, never deleted
+		assertThat(Files.exists(folder.resolve(".thumbnails").resolve("old-codec.mp4.jpg"))).isTrue();
+		assertThat(Files.exists(folder.resolve("broken.mp4"))).isTrue(); // skipped, never deleted
 	}
 
 	@Test
@@ -180,13 +188,17 @@ class VideoImportTest {
 		assertThat(Files.exists(original)).isTrue();
 	}
 
+	/** Until 27/10/2026 anything but H.264 was refused; now it is kept, with an H.264 playback copy queued. */
 	@Test
-	void wrongCodec_rejected_notH264() throws IOException {
-		MockMultipartFile file = mpeg4Mp4File("wrong-codec.mp4");
+	void otherCodec_accepted_withPlaybackCopyQueued() throws IOException {
+		MockMultipartFile file = mpeg4Mp4File("other-codec.mp4");
 
-		assertThatThrownBy(() -> importService.importImage(auth, file, false, false, null, "videos", null))
-				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("H.264");
+		ImportResponse result = importService.importImage(auth, file, false, false, null, "videos", null);
+
+		assertThat(result.image().videoPlayback()).isEqualTo("PENDING");
+		assertThat(videoJobRepository.findByImageId(result.image().id())).singleElement()
+				.satisfies(job -> assertThat(job.getStage()).isEqualTo(VideoJob.Stage.PLAYBACK_COPY));
+		assertThat(Files.exists(storageRoot.resolve("videos").resolve(".thumbnails").resolve("other-codec.mp4.jpg"))).isTrue();
 	}
 
 	@Test

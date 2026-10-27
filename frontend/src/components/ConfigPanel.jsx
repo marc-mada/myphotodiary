@@ -129,6 +129,8 @@ export function ConfigPanel({ selfOnly = false }) {
 	const [targetUploadSeconds, setTargetUploadSeconds] = useState(10);
 	const [maxShareSize, setMaxShareSize] = useState(50);
 	const [allowVideoSharing, setAllowVideoSharing] = useState(false);
+	const [compactOriginalVideos, setCompactOriginalVideos] = useState(false);
+	const [videoJobs, setVideoJobs] = useState(null);
 	const [savingVideoSize, setSavingVideoSize] = useState(false);
 	const [videoSizeError, setVideoSizeError] = useState(null);
 	const reportVideoSizeError = useForbiddenAwareError(setVideoSizeError);
@@ -147,8 +149,14 @@ export function ConfigPanel({ selfOnly = false }) {
 				setTargetUploadSeconds(settings.targetUploadSeconds);
 				setMaxShareSize(settings.maxShareSize);
 				setAllowVideoSharing(settings.allowVideoSharing);
+				setCompactOriginalVideos(settings.compactOriginalVideos);
 			})
 			.catch(reportVideoSizeError);
+		// Background video processing queue (27/10/2026) - informational only.
+		appSettingsApi
+			.videoJobs()
+			.then(setVideoJobs)
+			.catch(() => setVideoJobs(null));
 		// Non-critical label - a failure just leaves it hidden rather than
 		// adding a third error banner to this panel.
 		appSettingsApi
@@ -234,11 +242,13 @@ export function ConfigPanel({ selfOnly = false }) {
 				targetUploadSeconds: Math.round(Number(targetUploadSeconds)),
 				maxShareSize: Math.round(Number(maxShareSize)),
 				allowVideoSharing,
+				compactOriginalVideos,
 			});
 			setMaxVideoSizeMb(Math.round(settings.maxVideoSizeBytes / (1024 * 1024)));
 			setTargetUploadSeconds(settings.targetUploadSeconds);
 			setMaxShareSize(settings.maxShareSize);
 			setAllowVideoSharing(settings.allowVideoSharing);
+			setCompactOriginalVideos(settings.compactOriginalVideos);
 			// So this tab's next upload uses the new target, not the cached one.
 			invalidateTargetUploadSeconds();
 		} catch (err) {
@@ -360,6 +370,18 @@ export function ConfigPanel({ selfOnly = false }) {
 						<input type="checkbox" checked={allowVideoSharing} onChange={(e) => setAllowVideoSharing(e.target.checked)} />
 						{t('config.allowVideoSharing')}
 					</label>
+					{/* Compact original videos (27/10/2026) - off by default: re-encodes
+					    an original in an old or heavy format (ProRes, DV, MJPEG,
+					    MPEG-2...) to HEVC in the background. Permanent and lossy, so
+					    the backup holds the compacted file too. */}
+					<label className="config-checkbox">
+						<input type="checkbox" checked={compactOriginalVideos} onChange={(e) => setCompactOriginalVideos(e.target.checked)} />
+						{t('config.compactOriginalVideos')}
+					</label>
+					<p className="config-hint">{t('config.compactOriginalVideosHint')}</p>
+					{videoJobs && (videoJobs.pending > 0 || videoJobs.running > 0 || videoJobs.failed > 0) && (
+						<p className="config-hint">{t('config.videoJobs', { waiting: videoJobs.pending + videoJobs.running, failed: videoJobs.failed })}</p>
+					)}
 					{videoSizeError && <p className="form-error">{videoSizeError}</p>}
 					<button type="submit" disabled={savingVideoSize}>
 						{savingVideoSize ? t('common.saving') : t('common.save')}

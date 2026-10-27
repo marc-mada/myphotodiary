@@ -142,6 +142,10 @@ app:
   video:
     ffmpeg-path: ${MPD_FFMPEG_PATH:ffmpeg}
     ffprobe-path: ${MPD_FFPROBE_PATH:ffprobe}
+    # Background video transcoding workers (VideoJobRunner, 27/10/2026) -
+    # each ffmpeg already uses every core, so 1 is right for most servers;
+    # 2 at most on a big one. 0 turns background transcoding off.
+    transcode-workers: ${MPD_VIDEO_TRANSCODE_WORKERS:1}
     # Signs short-lived video streaming tokens (VideoStreamTokenService) -
     # unset by default (a random per-restart key, see that class's own
     # javadoc for the accepted trade-off); set MPD_VIDEO_TOKEN_SECRET for a

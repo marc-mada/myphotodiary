@@ -33,9 +33,10 @@ import { isValidSequenceName } from '../gallery/sequenceName';
  * `accept` (now a prop, see below) widened to `image/*,video/mp4` on
  * Publish (01/09/2026, real gap found live: Publish/Camera on mobile only
  * ever offered photos) once this project's own video support existed - the
- * same MP4-only client-side courtesy filter desktop's own `Uploader.jsx`
- * already applies (`acceptedFileTypes`), the real codec-level check
- * staying server-side either way (`VideoFormatValidator`).
+ * same client-side courtesy filter desktop's own `Uploader.jsx` already
+ * applies (`acceptedFileTypes`), the real check staying server-side either
+ * way (`VideoFormatValidator`). `image/*,video/*` since 27/10/2026: any
+ * video ffmpeg can read is accepted, an H.264 copy being made when needed.
  *
  * **Real bug found live, 03/09/2026, on Camera specifically**: widening
  * `accept` to two different top-level media types (`image/*` *and*
@@ -100,7 +101,7 @@ function withUniqueName(file) {
 	return new File([file], `${base}-${Date.now()}${ext}`, { type: file.type, lastModified: file.lastModified });
 }
 
-export function MobileImportForm({ capture, accept = 'image/*,video/mp4', multiple, buttonLabel, buttonIcon, currentDirectoryPath, onImported, initialFiles, targetPath }) {
+export function MobileImportForm({ capture, accept = 'image/*,video/*', multiple, buttonLabel, buttonIcon, currentDirectoryPath, onImported, initialFiles, targetPath }) {
 	// `targetPath` (shared files only, 25/10/2026): undefined = sort by date into
 	// a new sequence (the default); a string = add every file to that existing
 	// folder; null = that option is on but no folder chosen yet.

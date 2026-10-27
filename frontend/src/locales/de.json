@@ -197,7 +197,10 @@
     "maxShareSize": "Maximale Anzahl Fotos in einem geteilten Suchergebnis",
     "allowVideoSharing": "Teilen von Videos per Link erlauben (von diesem Server an jeden mit dem Link gestreamt)",
     "presentation": "Darstellung (Desktop)",
-    "onlineCapture": "Online-Aufnahme (Mobil: Kamera und Filmen im Menü)"
+    "onlineCapture": "Online-Aufnahme (Mobil: Kamera und Filmen im Menü)",
+    "compactOriginalVideos": "Originalvideos in alten oder großen Formaten komprimieren (Neukodierung in HEVC)",
+    "compactOriginalVideosHint": "ProRes, DV, MJPEG, MPEG-2, AVI… werden nach ihrer Wiedergabekopie im Hintergrund neu kodiert. Endgültig: Die Originaldatei wird durch eine kleinere ersetzt.",
+    "videoJobs": "Videos in Bearbeitung: {{waiting}}. Fehlgeschlagen: {{failed}}."
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "neuer/verzeichnis/pfad",
@@ -316,5 +319,10 @@
     "old-rose": "Altrosa-Galerie",
     "deep-blue": "Tiefblau-Galerie",
     "lagoon": "Lagunen-Galerie"
+  },
+  "video": {
+    "preparing": "Video wird vorbereitet… Es wird hier abgespielt, sobald es bereit ist.",
+    "preparingShared": "Dieses Video wird noch vorbereitet. Versuchen Sie es in einigen Minuten erneut.",
+    "unavailable": "Dieses Video kann in diesem Browser nicht abgespielt werden."
   }
 }
