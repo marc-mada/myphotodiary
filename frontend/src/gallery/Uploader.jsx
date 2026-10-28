@@ -55,6 +55,8 @@ export function Uploader({ currentDirectoryPath, onImported }) {
 	const { t } = useTranslation();
 	const [sortAndCreate, setSortAndCreate] = useState(true);
 	const [subDirName, setSubDirName] = useState('');
+	// Videos being compressed before upload (28/10/2026): name -> 0..1.
+	const [compressing, setCompressing] = useState({});
 
 	const server = {
 		process: (fieldName, file, metadata, load, error, progress, abort) => {
@@ -85,6 +87,13 @@ export function Uploader({ currentDirectoryPath, onImported }) {
 				url: `/api/import?${params.toString()}`,
 				headers: getCsrfHeader(),
 				onProgress: (loaded, total) => progress(true, loaded, total),
+				onCompressProgress: (fraction) =>
+					setCompressing((current) => {
+						const next = { ...current };
+						if (fraction == null) delete next[file.name];
+						else next[file.name] = fraction;
+						return next;
+					}),
 			});
 			upload.promise.then(
 				({ status, responseText }) => {
@@ -97,7 +106,7 @@ export function Uploader({ currentDirectoryPath, onImported }) {
 					}
 				},
 				(err) => {
-					if (err?.name !== 'AbortError') error('Upload failed: network error');
+					if (err?.name !== 'AbortError') error(err?.message === 'network error' ? 'Upload failed: network error' : err.message);
 				},
 			);
 			return {
@@ -150,8 +159,16 @@ export function Uploader({ currentDirectoryPath, onImported }) {
 				// (VideoFormatValidator).
 				acceptedFileTypes={['image/*', 'video/*']}
 				server={server}
+				// The actual reason (server refusal, video too long for the size
+				// limit...) rather than FilePond's generic "Error during upload".
+				labelFileProcessingError={(err) => err?.body || 'Error during upload'}
 				labelIdle={t('upload.dropHere', { browseAction: `<span class="filepond--label-action">${t('upload.browse')}</span>` })}
 			/>
+			{Object.entries(compressing).map(([name, fraction]) => (
+				<p key={name} className="upload-compressing">
+					{t('upload.compressing', { name, percent: Math.round(fraction * 100) })}
+				</p>
+			))}
 		</div>
 	);
 }

@@ -130,6 +130,7 @@ export function ConfigPanel({ selfOnly = false }) {
 	const [maxShareSize, setMaxShareSize] = useState(50);
 	const [allowVideoSharing, setAllowVideoSharing] = useState(false);
 	const [compactOriginalVideos, setCompactOriginalVideos] = useState(false);
+	const [videoCompressionFloor, setVideoCompressionFloor] = useState(720);
 	const [videoJobs, setVideoJobs] = useState(null);
 	const [savingVideoSize, setSavingVideoSize] = useState(false);
 	const [videoSizeError, setVideoSizeError] = useState(null);
@@ -150,6 +151,7 @@ export function ConfigPanel({ selfOnly = false }) {
 				setMaxShareSize(settings.maxShareSize);
 				setAllowVideoSharing(settings.allowVideoSharing);
 				setCompactOriginalVideos(settings.compactOriginalVideos);
+				setVideoCompressionFloor(settings.videoCompressionFloor);
 			})
 			.catch(reportVideoSizeError);
 		// Background video processing queue (27/10/2026) - informational only.
@@ -243,12 +245,14 @@ export function ConfigPanel({ selfOnly = false }) {
 				maxShareSize: Math.round(Number(maxShareSize)),
 				allowVideoSharing,
 				compactOriginalVideos,
+				videoCompressionFloor: Number(videoCompressionFloor),
 			});
 			setMaxVideoSizeMb(Math.round(settings.maxVideoSizeBytes / (1024 * 1024)));
 			setTargetUploadSeconds(settings.targetUploadSeconds);
 			setMaxShareSize(settings.maxShareSize);
 			setAllowVideoSharing(settings.allowVideoSharing);
 			setCompactOriginalVideos(settings.compactOriginalVideos);
+			setVideoCompressionFloor(settings.videoCompressionFloor);
 			// So this tab's next upload uses the new target, not the cached one.
 			invalidateTargetUploadSeconds();
 		} catch (err) {
@@ -357,6 +361,17 @@ export function ConfigPanel({ selfOnly = false }) {
 							onChange={(e) => setTargetUploadSeconds(e.target.value)}
 						/>
 					</label>
+					{/* Lowest resolution a video is compressed to in the browser
+					    before upload (28/10/2026, explicit ask, default 720p -
+					    ../upload/videoCompress.js). */}
+					<label>
+						{t('config.videoCompressionFloor')}
+						<select value={videoCompressionFloor} onChange={(e) => setVideoCompressionFloor(e.target.value)}>
+							<option value={720}>720p</option>
+							<option value={1080}>1080p</option>
+						</select>
+					</label>
+					<p className="config-hint">{t('config.videoCompressionFloorHint')}</p>
 					{/* Most pictures a shared search result may hold (04/10/2026) -
 					    above it, the first ones are shared and the sharer warned.
 					    Same 1..1000 bounds as AppSettingsService. */}

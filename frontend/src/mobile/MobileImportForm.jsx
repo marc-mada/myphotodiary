@@ -117,6 +117,8 @@ export function MobileImportForm({ capture, accept = 'image/*,video/*', multiple
 	const [selectedFiles, setSelectedFiles] = useState(initialFiles ?? []);
 	const [uploading, setUploading] = useState(false);
 	const [progress, setProgress] = useState(null); // { done, total }
+	// A video being compressed before upload (28/10/2026): { name, fraction }.
+	const [compressing, setCompressing] = useState(null);
 	const [error, setError] = useState(null);
 	const reportError = useForbiddenAwareError(setError);
 
@@ -159,6 +161,7 @@ export function MobileImportForm({ capture, accept = 'image/*,video/*', multiple
 			file,
 			url: `/api/import?${params.toString()}`,
 			headers: getCsrfHeader(),
+			onCompressProgress: (fraction) => setCompressing(fraction == null ? null : { name: file.name, fraction }),
 		}).promise;
 		let body = null;
 		try {
@@ -222,6 +225,14 @@ export function MobileImportForm({ capture, accept = 'image/*,video/*', multiple
 		}
 	}
 
+	const uploadLabel = !uploading
+		? t('mobile.upload')
+		: compressing
+			? t('upload.compressing', { name: compressing.name, percent: Math.round(compressing.fraction * 100) })
+			: progress
+				? t('mobile.uploadingProgress', { done: progress.done, total: progress.total })
+				: t('mobile.uploading');
+
 	if (initialFiles) {
 		return (
 			<>
@@ -236,7 +247,7 @@ export function MobileImportForm({ capture, accept = 'image/*,video/*', multiple
 				{error && <p className="form-error mobile-import-error">{error}</p>}
 				<p className="mobile-selected-files">{t('mobile.picturesSelected', { count: selectedFiles.length })}</p>
 				<button type="button" onClick={handleUpload} disabled={uploading || selectedFiles.length === 0 || (toExisting && !targetPath)}>
-					{uploading ? (progress ? t('mobile.uploadingProgress', { done: progress.done, total: progress.total }) : t('mobile.uploading')) : t('mobile.upload')}{' '}
+					{uploadLabel}{' '}
 					<MobileIcon name="action" />
 				</button>
 			</>
@@ -289,7 +300,7 @@ export function MobileImportForm({ capture, accept = 'image/*,video/*', multiple
 				<p className="mobile-selected-files">{t('mobile.picturesSelected', { count: selectedFiles.length })}</p>
 			)}
 			<button type="button" onClick={handleUpload} disabled={uploading || selectedFiles.length === 0}>
-				{uploading ? (progress ? t('mobile.uploadingProgress', { done: progress.done, total: progress.total }) : t('mobile.uploading')) : t('mobile.upload')}{' '}
+				{uploadLabel}{' '}
 				<MobileIcon name="action" />
 			</button>
 		</>

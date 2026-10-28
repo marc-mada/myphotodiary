@@ -18,14 +18,19 @@ package org.myphotodiary.cms.settings.dto;
 
 /** Optional - present a value to change it (same convention as UpdateMeRequest). */
 public record UpdateAppSettingsRequest(Long maxVideoSizeBytes, Integer targetUploadSeconds, Integer maxShareSize, Boolean allowVideoSharing,
-		Boolean compactOriginalVideos) {
+		Boolean compactOriginalVideos, Integer videoCompressionFloor) {
 
 	public UpdateAppSettingsRequest(Long maxVideoSizeBytes, Integer targetUploadSeconds, Integer maxShareSize) {
-		this(maxVideoSizeBytes, targetUploadSeconds, maxShareSize, null, null);
+		this(maxVideoSizeBytes, targetUploadSeconds, maxShareSize, null, null, null);
 	}
 
 	public UpdateAppSettingsRequest(Long maxVideoSizeBytes, Integer targetUploadSeconds, Integer maxShareSize, Boolean allowVideoSharing) {
-		this(maxVideoSizeBytes, targetUploadSeconds, maxShareSize, allowVideoSharing, null);
+		this(maxVideoSizeBytes, targetUploadSeconds, maxShareSize, allowVideoSharing, null, null);
+	}
+
+	public UpdateAppSettingsRequest(Long maxVideoSizeBytes, Integer targetUploadSeconds, Integer maxShareSize, Boolean allowVideoSharing,
+			Boolean compactOriginalVideos) {
+		this(maxVideoSizeBytes, targetUploadSeconds, maxShareSize, allowVideoSharing, compactOriginalVideos, null);
 	}
 
 }

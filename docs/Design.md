@@ -112,6 +112,7 @@ when turned on, compacts old-format originals to HEVC (`libx265`) — see
 | @vitejs/plugin-react | 6.1.0 | React JSX support in Vite |
 | react-filepond + filepond | 7.1.3 / 4.32.12 | Drag-and-drop upload widget |
 | leaflet | 1.9.4 | Interactive map (sequence geolocation picker) - replaced @googlemaps/js-api-loader 16/09/2026, no API key needed |
+| mediabunny | 1.61.3 | Video compression in the browser before upload (WebCodecs), loaded only when a video needs it - MPL-2.0 |
 | i18next + react-i18next + i18next-browser-languagedetector | 26.4.0 / 17.0.12 / 8.2.1 | i18n (en/fr/de/es), browser-language auto-detection |
 
 **Notably absent from the actual dependency tree, despite the original
@@ -243,6 +244,7 @@ erDiagram
 | V17 | `app_user.presentation` | Desktop presentation per user (`dark` default) |
 | V18 | `app_user.online_capture` | Mobile Camera/Film menu entries per user (off by default) |
 | V19 | `image.video_playback`, `video_job`, `app_settings.compact_original_videos` | Any video format accepted: background H.264 playback copies, optional compaction of old-format originals (§8) |
+| V20 | `app_settings.video_compression_floor` | Lowest resolution (720 or 1080) for videos compressed in the browser before upload (§8) |
 
 Every migration after V2/V3 deliberately adds only the column(s) the
 screen actually being built needs at that moment — a running principle
@@ -400,7 +402,7 @@ means "any authenticated role."
 | DELETE | `/api/users/{userName}` | ADMIN | Delete user |
 | GET/POST/DELETE | `/api/users/{userName}/roles[/{groupName}]` | ADMIN | Role assignments |
 | GET/PATCH | `/api/users/{userName}/settings` | ADMIN | Admin edits *another* user's settings |
-| GET | `/api/app-settings` | any | Read app-wide settings (max video size, upload target, max share size, video sharing allowed) |
+| GET | `/api/app-settings` | any | Read app-wide settings (max video size, upload target, max share size, video sharing allowed, video compression floor) |
 | GET | `/api/version` | Authenticated | Version of the backend jar actually running (Spring Boot build-info), shown in Admin → Configure |
 <!-- app-settings now also carries targetUploadSeconds (V13) - drives frontend/src/upload/adaptiveShrink.js -->
 | PATCH | `/api/app-settings` | ADMIN | Update app-wide settings |
@@ -419,7 +421,7 @@ means "any authenticated role."
 | GET | `/api/images/{imageId}/web` | any | 1600px "web" tier (falls back to original) |
 | GET | `/api/images/{imageId}/original` | any | Full original bytes |
 | GET | `/api/images/{imageId}/export` | any | Same bytes as `/original`, `Content-Disposition: attachment` |
-| POST | `/api/import` | RBAC `CREATE_SEQUENCE`/`EDIT_SEQUENCE` | Browser upload — EXIF auto-sort, one file at a time |
+| POST | `/api/import` | RBAC `CREATE_SEQUENCE`/`EDIT_SEQUENCE` | Browser upload — EXIF auto-sort, one file at a time. A video compressed in the browser adds `clientCompressed=true` and the original's `sourceCreationTime`/`sourceAppleCreationDate`/`sourceLocation` (§8) |
 | GET | `/api/directory-tree` | any | Lazy-loaded, filesystem-driven navigation tree |
 | GET | `/api/directory-tree/all` | any | Fully flattened tree, for batch operations |
 | POST | `/api/directory-index` | any (see §7 note) | Index a directory found on disk |
@@ -606,6 +608,48 @@ Publish and indexing of files already on the server have no cap. No
 equivalent cap on photos. The image backup (`backup-images.sh`) skips
 `.webimg/`, so playback copies aren't backed up: a re-index queues them
 again.
+
+**Compression in the browser before upload** (28/10/2026,
+`frontend/src/upload/videoCompress.js`, the video counterpart of the photo
+shrinking in `adaptiveShrink.js`, plugged into the same `adaptiveUpload.js`
+— desktop Publish, mobile Publish/Camera/Film, Share to myPhotoDiary; not
+Batch Publish). Fully automatic: when a video wouldn't upload within the
+target time (`target_upload_seconds` × measured link speed), the browser
+re-encodes it with WebCodecs (Mediabunny, a lazily loaded chunk) to H.264
++ AAC in MP4 (Opus where the browser can't encode AAC, e.g. Firefox), at
+most 30 fps, on a quality ladder: 1080p (short side) 5→3 Mbit/s, then
+720p 3→1.5 Mbit/s; the floor (720p at 1.5 Mbit/s, or 1080p at 3 Mbit/s
+when `video_compression_floor` is 1080) is used even when the budget
+isn't met. Never upscaled, never above the source's video bit rate (1.5×
+it for HEVC/VP9/AV1). The original is uploaded unchanged — and the size
+cap above applies to it — when it fits the target, the link speed isn't
+known yet (a running upload may still switch to a compressed copy once it
+is, as for photos), the estimate isn't below 70% of the original or the
+result isn't smaller, it's HDR or longer than 15 minutes, or the browser
+can't (no WebCodecs, can't decode it, can't encode H.264, error). An
+original above the maximum video size is compressed whatever the link
+speed, aiming at 90% of the limit (or the speed budget if smaller),
+ignoring the 70% and HDR rules; the server applies the limit to the
+compressed result. Before that, the size at the floor is estimated from
+the duration alone (`(floor bit rate + audio) × duration`, which matched
+the real result within 1% in testing): above 1.15× the limit the video is
+refused at once — nothing compressed or sent — with a translated message
+(`upload.videoTooLong`); between the limit and 1.15× it's tried and the
+server decides. Duration rather than the original's size, because a
+short 4K clip far above the limit still fits once compressed. One
+compression at a time; the screen is kept awake (Wake Lock) meanwhile. The
+compressed file becomes the original (`name.mp4`, same `lastModified`),
+and usually needs no playback copy.
+
+A compressed file's own metadata isn't reliable — its movie header holds
+the time of compression and the location is lost (checked with the
+`video-probe` prototype) — so the output gets no tags, and the browser
+sends what it read from the original (movie header date, Apple creation
+date, ISO 6709 location; a 3GPP `loci` box converted to ISO 6709) as
+`sourceCreationTime`/`sourceAppleCreationDate`/`sourceLocation` with
+`clientCompressed=true`. The server then ignores the uploaded file's own
+tags and runs those values through the same checks as a file's
+(`VideoFormatValidator.withClientMetadata`).
 
 **Fallback chain for photo derivatives** (`ImageStorageService`, 02/09/2026):
 a request for a missing derivative file falls back rather than failing —
@@ -982,8 +1026,15 @@ running dev instances, slice by slice.
   otherwise the colours look flat); HDR originals are never compacted.
   Playback copies aren't backed up (`.webimg/` is skipped): restoring the
   image tree and re-indexing queues them again. The shared viewer shows
-  "being prepared" but doesn't poll. The date recorded inside a video
-  file is still not read.
+  "being prepared" but doesn't poll. Since 28/10/2026 the recording date
+  and place inside a video are read (`VideoFormatValidator`, from
+  ffprobe's format tags: `com.apple.quicktime.creationdate` - local time
+  with offset, preferred - else `creation_time` in UTC converted to the
+  server's zone; `com.apple.quicktime.location.ISO6709` else `location`,
+  i.e. a `©xyz` or `loci` box; unset dates before 1971 and 0/0 places
+  ignored). The date takes EXIF's place at the top of `ExifDateReader`'s
+  chain; new uploads, Batch Publish and first indexing only - existing
+  video rows keep their date.
 
 - **Share to myPhotoDiary (21/10/2026)** — Web Share Target
   (`manifest.json`'s `share_target`, POST `/share-receive`), received by
@@ -996,8 +1047,9 @@ running dev instances, slice by slice.
   all, no Firefox); desktop not offered. If the worker isn't active (site
   data cleared), the share POST reaches the web server and fails. WhatsApp
   strips EXIF dates and GPS, so such photos are filed by their file-name
-  date or the file's date. A video is filed by the file's date (the date
-  recorded inside an MP4/MOV is not read), usually the day it was shared.
+  date or the file's date. A video is filed by the date recorded inside
+  it when the shared file still has it (since 28/10/2026), else by the
+  file's date, usually the day it was shared.
 - **Auth strategy resolved (18/09/2026)** — session-cookie login, backed
   by the embedded Tomcat's own `HttpSession` (§7). No longer an open
   decision/placeholder.

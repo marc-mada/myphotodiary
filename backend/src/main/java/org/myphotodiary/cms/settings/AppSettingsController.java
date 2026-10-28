@@ -66,6 +66,9 @@ public class AppSettingsController {
 		if (request.compactOriginalVideos() != null) {
 			service.updateCompactOriginalVideos(request.compactOriginalVideos());
 		}
+		if (request.videoCompressionFloor() != null) {
+			service.updateVideoCompressionFloor(request.videoCompressionFloor());
+		}
 		return AppSettingsResponse.from(service.get());
 	}
 }

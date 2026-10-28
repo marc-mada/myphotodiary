@@ -150,6 +150,26 @@ public class ImportService {
 	@Transactional
 	public ImportResponse importImage(Authentication authentication, MultipartFile file, boolean autoSort, boolean createSubDir,
 			String subDirName, String dirPath, String groupName, Long clientLastModifiedEpochMillis) {
+		return importImage(authentication, file, autoSort, createSubDir, subDirName, dirPath, groupName, clientLastModifiedEpochMillis, null);
+	}
+
+	/**
+	 * What the browser read from a video's original before compressing it
+	 * (28/10/2026): the raw tag values, as ffprobe would report them on the
+	 * original. Used instead of the uploaded file's own tags, which a
+	 * browser compression rewrites (the movie header then holds the time of
+	 * compression) - see VideoFormatValidator#withClientMetadata.
+	 */
+	public record ClientVideoMetadata(String creationTime, String appleCreationDate, String location) {
+	}
+
+	/**
+	 * @param clientVideo non-null only for a video compressed in the browser
+	 *        before upload (ignored for a picture)
+	 */
+	@Transactional
+	public ImportResponse importImage(Authentication authentication, MultipartFile file, boolean autoSort, boolean createSubDir,
+			String subDirName, String dirPath, String groupName, Long clientLastModifiedEpochMillis, ClientVideoMetadata clientVideo) {
 		String originalFilename = file.getOriginalFilename();
 		if (originalFilename == null || originalFilename.isBlank()) {
 			throw new IllegalArgumentException("Uploaded file has no name");
@@ -176,6 +196,10 @@ public class ImportService {
 		try {
 			file.transferTo(tempFile);
 			VideoInfo videoInfo = validateVideoIfNeeded(tempFile, mediaType, true);
+			if (videoInfo != null && clientVideo != null) {
+				videoInfo = videoFormatValidator.withClientMetadata(videoInfo, clientVideo.creationTime(), clientVideo.appleCreationDate(),
+						clientVideo.location());
+			}
 
 			// No EXIF in a video file - ExifDateReader's own generic
 			// metadata-extractor read simply finds no ExifSubIFDDirectory and
@@ -184,7 +208,7 @@ public class ImportService {
 			// from legacy verbatim, before this project had any video support
 			// at all), and file creation time is a sensible final fallback
 			// either way - verified live, not assumed.
-			LocalDateTime imgDate = exifDateReader.readCaptureDate(tempFile, originalFilename, clientLastModified, null);
+			LocalDateTime imgDate = exifDateReader.readCaptureDate(tempFile, originalFilename, clientLastModified, null, null, recordedAt(videoInfo));
 			if (imgDate == null) {
 				imgDate = LocalDateTime.now(); // legacy's own final fallback when even EXIF/WhatsApp/client-time/file-time all come up empty
 			}
@@ -265,7 +289,7 @@ public class ImportService {
 
 			LocalDateTime imgDate = forcedDate != null
 					? forcedDate
-					: exifDateReader.readCaptureDate(sourceFile, originalFilename, null, null, fallbackDate);
+					: exifDateReader.readCaptureDate(sourceFile, originalFilename, null, null, fallbackDate, recordedAt(videoInfo));
 			if (imgDate == null) {
 				// Same last-resort fallback as a regular Publish (no date of its
 				// own, no fallback date given, no readable file creation time).
@@ -277,6 +301,10 @@ public class ImportService {
 		} catch (IOException e) {
 			throw new UncheckedIOException("Failed to import " + originalFilename, e);
 		}
+	}
+
+	private static LocalDateTime recordedAt(VideoInfo videoInfo) {
+		return videoInfo == null ? null : videoInfo.recordedAt();
 	}
 
 	/** {@code null} for a picture. {@code checkSize}: browser uploads only. */
@@ -341,10 +369,9 @@ public class ImportService {
 				: DirectoryDateRules.updateDirDate(directory.getSequenceDate(), imgDate.toLocalDate()));
 
 		Image image = new Image(originalFilename, directory, imgDate, mediaType);
-		// null for a video (no GPS tag to find via this generic image-EXIF
-		// read, same as ExifDateReader's own unbranched read above) or a
-		// photo with no GPS tag at all - never a placeholder like 0/0.
-		ExifGpsReader.Coordinates gps = exifGpsReader.readGpsCoordinates(sourceFile);
+		// A video's place comes from its own metadata (VideoInfo, 28/10/2026);
+		// a photo's from EXIF. null when there is none - never a placeholder like 0/0.
+		ExifGpsReader.Coordinates gps = videoInfo != null ? videoInfo.location() : exifGpsReader.readGpsCoordinates(sourceFile);
 		if (gps != null) {
 			image.setLatitude(gps.latitude());
 			image.setLongitude(gps.longitude());

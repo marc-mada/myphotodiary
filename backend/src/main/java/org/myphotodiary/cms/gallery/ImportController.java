@@ -59,8 +59,19 @@ public class ImportController {
 			// found while chasing a live report of photos landing on the
 			// upload date instead of their real one. Optional - an older
 			// client that doesn't send it just gets the pre-existing behavior.
-			@RequestParam(required = false) Long clientLastModifiedEpochMillis) {
-		return importService.importImage(authentication, file, autoSort, createSubDir, subDirName, dirPath, groupName, clientLastModifiedEpochMillis);
+			@RequestParam(required = false) Long clientLastModifiedEpochMillis,
+			// A video compressed in the browser (28/10/2026): its own metadata
+			// is the compression's, so the original's recording date and place
+			// come as separate fields - see ImportService.ClientVideoMetadata.
+			@RequestParam(defaultValue = "false") boolean clientCompressed,
+			@RequestParam(required = false) String sourceCreationTime,
+			@RequestParam(required = false) String sourceAppleCreationDate,
+			@RequestParam(required = false) String sourceLocation) {
+		ImportService.ClientVideoMetadata clientVideo = clientCompressed
+				? new ImportService.ClientVideoMetadata(sourceCreationTime, sourceAppleCreationDate, sourceLocation)
+				: null;
+		return importService.importImage(authentication, file, autoSort, createSubDir, subDirName, dirPath, groupName, clientLastModifiedEpochMillis,
+				clientVideo);
 	}
 
 	/** Legacy's real Batch Publish (01/09/2026) - see StagingImportService's own javadoc. */

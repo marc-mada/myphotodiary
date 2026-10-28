@@ -57,6 +57,10 @@ public class AppSettings {
 	@Column(name = "compact_original_videos", nullable = false)
 	private boolean compactOriginalVideos;
 
+	/** V20 - lowest short side (720 or 1080) a browser may compress a video to, see AppSettingsService#updateVideoCompressionFloor. */
+	@Column(name = "video_compression_floor", nullable = false)
+	private int videoCompressionFloor;
+
 	protected AppSettings() {
 		// JPA
 	}
@@ -103,5 +107,13 @@ public class AppSettings {
 
 	public void setCompactOriginalVideos(boolean compactOriginalVideos) {
 		this.compactOriginalVideos = compactOriginalVideos;
+	}
+
+	public int getVideoCompressionFloor() {
+		return videoCompressionFloor;
+	}
+
+	public void setVideoCompressionFloor(int videoCompressionFloor) {
+		this.videoCompressionFloor = videoCompressionFloor;
 	}
 }

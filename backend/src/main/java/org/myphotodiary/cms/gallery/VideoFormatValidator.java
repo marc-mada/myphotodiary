@@ -18,14 +18,23 @@ package org.myphotodiary.cms.gallery;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * Reads a video with ffprobe (bundled with ffmpeg, already this feature's
@@ -39,6 +48,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * copy when the original isn't playable everywhere. The codec still has to
  * be probed rather than trusted from the extension: an iPhone's HEVC can sit
  * in a `.mov` or a `.mp4` alike.
+ *
+ * Also reads the recording date and place the camera wrote (28/10/2026),
+ * checked on real phones with the video-probe prototype: Android writes the
+ * date only in the movie header (ffprobe: {@code creation_time}, UTC) and the
+ * place as a {@code ©xyz} or {@code loci} box (ffprobe: {@code location});
+ * iPhone/iPad also write {@code com.apple.quicktime.creationdate} (local time
+ * with its offset - preferred, it is the time on the camera's clock) and
+ * {@code com.apple.quicktime.location.ISO6709}.
  */
 @Component
 public class VideoFormatValidator {
@@ -86,7 +103,81 @@ public class VideoFormatValidator {
 				video.path("pix_fmt").asText(""),
 				!"progressive".equals(fieldOrder) && !"unknown".equals(fieldOrder) && !fieldOrder.isEmpty(),
 				"smpte2084".equals(transfer) || "arib-std-b67".equals(transfer),
-				format.path("duration").asDouble(0));
+				format.path("duration").asDouble(0),
+				recordedAt(format.path("tags")),
+				location(format.path("tags")));
+	}
+
+	private static final DateTimeFormatter APPLE_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss[.SSS]xx");
+	/** ISO 6709 in decimal degrees, as phones write it: "+48.8567+002.3508+035.000/". */
+	private static final Pattern ISO_6709 = Pattern.compile("^\\s*([+-]\\d{1,3}(?:\\.\\d+)?)([+-]\\d{1,3}(?:\\.\\d+)?)");
+	/** Before this, a creation time is an unset field (0 = 1904 or 1970 depending on the writer). */
+	private static final LocalDateTime EARLIEST_PLAUSIBLE = LocalDateTime.of(1971, 1, 1, 0, 0);
+
+	/**
+	 * A video compressed in the browser before upload (28/10/2026) carries
+	 * no reliable metadata of its own - its movie header holds the time of
+	 * compression - so the browser reads the original's tags and sends them
+	 * alongside. Given the same raw values ffprobe would report, they go
+	 * through the same checks as a file's own tags.
+	 */
+	VideoInfo withClientMetadata(VideoInfo info, String creationTime, String appleCreationDate, String location) {
+		ObjectNode tags = objectMapper.createObjectNode();
+		if (creationTime != null) tags.put("creation_time", creationTime);
+		if (appleCreationDate != null) tags.put("com.apple.quicktime.creationdate", appleCreationDate);
+		if (location != null) tags.put("location", location);
+		return info.withRecording(recordedAt(tags), location(tags));
+	}
+
+	static LocalDateTime recordedAt(JsonNode tags) {
+		LocalDateTime apple = parseAppleDate(tags.path("com.apple.quicktime.creationdate").asText(""));
+		if (apple != null) {
+			return apple;
+		}
+		// ffprobe joins duplicate tags with ';' - the first one is the movie header's.
+		String creation = tags.path("creation_time").asText("").split(";")[0].trim();
+		if (creation.isEmpty()) {
+			return null;
+		}
+		try {
+			return plausible(LocalDateTime.ofInstant(Instant.parse(creation), ZoneId.systemDefault()));
+		} catch (DateTimeParseException e) {
+			return null;
+		}
+	}
+
+	private static LocalDateTime parseAppleDate(String value) {
+		if (value.isBlank()) {
+			return null;
+		}
+		try {
+			return plausible(OffsetDateTime.parse(value.trim(), APPLE_DATE).toLocalDateTime());
+		} catch (DateTimeParseException e) {
+			try {
+				return plausible(OffsetDateTime.parse(value.trim()).toLocalDateTime());
+			} catch (DateTimeParseException e2) {
+				return null;
+			}
+		}
+	}
+
+	private static LocalDateTime plausible(LocalDateTime date) {
+		return date.isBefore(EARLIEST_PLAUSIBLE) || date.isAfter(LocalDateTime.now().plusDays(1)) ? null : date;
+	}
+
+	static ExifGpsReader.Coordinates location(JsonNode tags) {
+		for (String key : List.of("com.apple.quicktime.location.ISO6709", "location")) {
+			Matcher m = ISO_6709.matcher(tags.path(key).asText(""));
+			if (m.find()) {
+				double latitude = Double.parseDouble(m.group(1));
+				double longitude = Double.parseDouble(m.group(2));
+				boolean valid = Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180 && !(latitude == 0 && longitude == 0);
+				if (valid) {
+					return new ExifGpsReader.Coordinates(latitude, longitude);
+				}
+			}
+		}
+		return null;
 	}
 
 	/** avg_frame_rate when known, else r_frame_rate - both are fractions like "30000/1001". */

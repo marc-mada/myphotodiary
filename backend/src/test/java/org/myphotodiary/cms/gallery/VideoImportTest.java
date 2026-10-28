@@ -23,6 +23,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -229,6 +232,104 @@ class VideoImportTest {
 				.isInstanceOf(AccessDeniedException.class);
 	}
 
+	/**
+	 * 28/10/2026: a video is dated and placed from what the camera wrote in it,
+	 * before the browser's file date. Android: movie-header date (UTC) and an
+	 * ISO 6709 location.
+	 */
+	@Test
+	void androidStyleVideo_isDatedAndPlacedFromItsOwnMetadata() throws IOException {
+		MockMultipartFile file = generatedVideo("android.mp4", "libx264", ".mp4", "video/mp4",
+				"-metadata", "creation_time=2025-06-14T10:20:30Z", "-metadata", "location=+48.8567+002.3508/", "-f", "mov");
+
+		ImportResponse result = importService.importImage(auth, file, true, false, null, null, null, System.currentTimeMillis());
+
+		Image image = imageRepository.findById(result.image().id()).orElseThrow();
+		LocalDateTime expected = LocalDateTime.ofInstant(Instant.parse("2025-06-14T10:20:30Z"), ZoneId.systemDefault());
+		assertThat(image.getCaptureDate()).isEqualTo(expected);
+		assertThat(result.directory().path()).isEqualTo("2025/06");
+		assertThat(image.getLatitude()).isEqualTo(48.8567);
+		assertThat(image.getLongitude()).isEqualTo(2.3508);
+	}
+
+	/**
+	 * A video compressed in the browser (28/10/2026): its own header holds the
+	 * time of compression, so the original's date and place sent alongside
+	 * are used instead.
+	 */
+	@Test
+	void browserCompressedVideo_usesTheOriginalsDateAndPlaceSentAlongside() throws IOException {
+		MockMultipartFile file = generatedVideo("compressed.mp4", "libx264", ".mp4", "video/mp4",
+				"-metadata", "creation_time=2026-10-28T09:00:00Z");
+
+		ImportResponse result = importService.importImage(auth, file, true, false, null, null, null, System.currentTimeMillis(),
+				new ImportService.ClientVideoMetadata("2025-06-14T10:20:30.000Z", null, "+48.8567+002.3508/"));
+
+		Image image = imageRepository.findById(result.image().id()).orElseThrow();
+		LocalDateTime expected = LocalDateTime.ofInstant(Instant.parse("2025-06-14T10:20:30Z"), ZoneId.systemDefault());
+		assertThat(image.getCaptureDate()).isEqualTo(expected);
+		assertThat(result.directory().path()).isEqualTo("2025/06");
+		assertThat(image.getLatitude()).isEqualTo(48.8567);
+		assertThat(image.getLongitude()).isEqualTo(2.3508);
+	}
+
+	/** Nothing in the original: the compression's own date is ignored, the file date is used. */
+	@Test
+	void browserCompressedVideo_withoutOriginalMetadata_ignoresItsOwnHeaderDate() throws IOException {
+		MockMultipartFile file = generatedVideo("compressed-bare.mp4", "libx264", ".mp4", "video/mp4",
+				"-metadata", "creation_time=2026-10-28T09:00:00Z", "-metadata", "location=+00.0000+000.0000/", "-f", "mov");
+		long fileDate = Instant.parse("2023-04-05T12:00:00Z").toEpochMilli();
+
+		ImportResponse result = importService.importImage(auth, file, true, false, null, null, null, fileDate,
+				new ImportService.ClientVideoMetadata(null, null, null));
+
+		Image image = imageRepository.findById(result.image().id()).orElseThrow();
+		assertThat(result.directory().path()).isEqualTo("2023/04");
+		assertThat(image.getLatitude()).isNull();
+	}
+
+	/** iPhone/iPad: the local creation date (with its offset) wins over the UTC header date. */
+	@Test
+	void appleStyleVideo_usesLocalCreationDateAndIso6709Location() throws IOException {
+		MockMultipartFile file = generatedVideo("apple.mov", "libx264", ".mov", "video/quicktime",
+				"-movflags", "use_metadata_tags", "-metadata", "creation_time=2025-06-14T10:20:30Z",
+				"-metadata", "com.apple.quicktime.creationdate=2025-06-14T12:20:30+0200",
+				"-metadata", "com.apple.quicktime.location.ISO6709=+43.5804+007.1251+012.000/");
+
+		ImportResponse result = importService.importImage(auth, file, false, false, null, "apple-videos", null);
+
+		Image image = imageRepository.findById(result.image().id()).orElseThrow();
+		assertThat(image.getCaptureDate()).isEqualTo(LocalDateTime.of(2025, 6, 14, 12, 20, 30));
+		assertThat(image.getLatitude()).isEqualTo(43.5804);
+		assertThat(image.getLongitude()).isEqualTo(7.1251);
+	}
+
+	/** A video dropped on disk gets the same date and place when first indexed. */
+	@Test
+	void indexingADroppedVideo_readsItsDateAndPlace() throws IOException {
+		MockMultipartFile file = generatedVideo("dropped.mp4", "libx264", ".mp4", "video/mp4",
+				"-metadata", "creation_time=2024-03-02T08:00:00Z", "-metadata", "location=-33.8688+151.2093/", "-f", "mov");
+		Path folder = Files.createDirectories(storageRoot.resolve("2024/03/dropped-video"));
+		Files.write(folder.resolve("dropped.mp4"), file.getBytes());
+
+		indexerService.indexDirectory("2024/03/dropped-video", null);
+
+		Image image = imageRepository.findAll().stream().filter(i -> i.getName().equals("dropped.mp4")).findFirst().orElseThrow();
+		assertThat(image.getCaptureDate()).isEqualTo(LocalDateTime.ofInstant(Instant.parse("2024-03-02T08:00:00Z"), ZoneId.systemDefault()));
+		assertThat(image.getLatitude()).isEqualTo(-33.8688);
+		assertThat(image.getLongitude()).isEqualTo(151.2093);
+	}
+
+	/** No metadata (ffmpeg writes none unless asked): no place, the old date chain applies. */
+	@Test
+	void videoWithoutMetadata_hasNoLocation() throws IOException {
+		ImportResponse result = importService.importImage(auth, h264Mp4File("plain.mp4"), false, false, null, "plain-videos", null);
+
+		Image image = imageRepository.findById(result.image().id()).orElseThrow();
+		assertThat(image.getLatitude()).isNull();
+		assertThat(image.getCaptureDate()).isNotNull();
+	}
+
 	private static boolean commandRuns(String... command) {
 		try {
 			Process process = new ProcessBuilder(command).start();
@@ -258,7 +359,8 @@ class VideoImportTest {
 		return generatedVideo(name, "libx264", ".mov", "video/quicktime");
 	}
 
-	private static MockMultipartFile generatedVideo(String name, String videoCodec, String suffix, String contentType) throws IOException {
+	private static MockMultipartFile generatedVideo(String name, String videoCodec, String suffix, String contentType, String... outputOptions)
+			throws IOException {
 		Path temp = Files.createTempFile("mpd-test-video-", suffix);
 		Files.delete(temp); // ffmpeg -y below (re)creates it, but the file must not exist as a non-shaped empty file first
 		try {
@@ -277,6 +379,7 @@ class VideoImportTest {
 			if (withAudio) {
 				command.addAll(List.of("-c:a", "aac", "-shortest")); // exercises the audio-codec branch too, not just video
 			}
+			command.addAll(List.of(outputOptions));
 			command.add(temp.toString());
 			Process process = new ProcessBuilder(command).start();
 			process.getInputStream().readAllBytes();

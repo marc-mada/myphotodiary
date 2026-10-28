@@ -141,7 +141,9 @@
     "storeInCurrentPathPrefix": "Fotos speichern in: ",
     "sequenceNamePlaceholder": "Sequenzname",
     "dropHere": "Fotos hierher ziehen oder {{browseAction}}",
-    "browse": "durchsuchen"
+    "browse": "durchsuchen",
+    "compressing": "{{name}} wird komprimiert… {{percent}} %",
+    "videoTooLong": "Zu lang für die maximale Videogröße: etwa {{estimate}} MB selbst komprimiert, die Grenze liegt bei {{limit}} MB."
   },
   "admin": {
     "users": "Benutzer",
@@ -193,14 +195,16 @@
     "appWideSettingsHeading": "Anwendungsweite Einstellungen",
     "maxVideoSizeMb": "Maximale Videogröße (MB)",
     "appVersion": "myPhotoDiary Version {{version}}",
-    "targetUploadSeconds": "Angestrebte durchschnittliche Upload-Zeit pro Foto (Sekunden)",
+    "targetUploadSeconds": "Angestrebte durchschnittliche Upload-Dauer pro Foto oder Video (Sekunden)",
     "maxShareSize": "Maximale Anzahl Fotos in einem geteilten Suchergebnis",
     "allowVideoSharing": "Teilen von Videos per Link erlauben (von diesem Server an jeden mit dem Link gestreamt)",
     "presentation": "Darstellung (Desktop)",
     "onlineCapture": "Online-Aufnahme (Mobil: Kamera und Filmen im Menü)",
     "compactOriginalVideos": "Originalvideos in alten oder großen Formaten komprimieren (Neukodierung in HEVC)",
     "compactOriginalVideosHint": "ProRes, DV, MJPEG, MPEG-2, AVI… werden nach ihrer Wiedergabekopie im Hintergrund neu kodiert. Endgültig: Die Originaldatei wird durch eine kleinere ersetzt.",
-    "videoJobs": "Videos in Bearbeitung: {{waiting}}. Fehlgeschlagen: {{failed}}."
+    "videoJobs": "Videos in Bearbeitung: {{waiting}}. Fehlgeschlagen: {{failed}}.",
+    "videoCompressionFloor": "Niedrigste Auflösung für vor dem Hochladen komprimierte Videos",
+    "videoCompressionFloorHint": "Ein Video, das für die angestrebte Upload-Dauer zu groß ist, wird im Browser komprimiert, höchstens bis zu dieser Auflösung. Darunter dauert der Upload einfach länger."
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "neuer/verzeichnis/pfad",

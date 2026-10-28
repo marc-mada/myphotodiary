@@ -15,6 +15,8 @@
  ******************************************************************************/
 
 import { byteBudget, hasLiveMeasurement, maybeShrinkForUpload, meterBytesSent, meterUploadEnded, meterUploadStarted } from './adaptiveShrink';
+import { isVideoFile, maybeCompressVideo } from './videoCompress';
+import i18n from '../i18n';
 
 /**
  * One photo/video upload to `url` (a multipart POST, field "file"), with the
@@ -33,28 +35,45 @@ import { byteBudget, hasLiveMeasurement, maybeShrinkForUpload, meterBytesSent, m
  *    and the original is cancelled and replaced only if the shrunk copy is
  *    smaller than what remains to send. Checked once per upload.
  *
+ * Videos (28/10/2026) go through ./videoCompress.js instead of photo
+ * shrinking - same two moments, same rule; a compressed video also adds the
+ * original's recording date and place to the request (`params`).
+ * `onCompressProgress(fraction | null)` reports a video's compression
+ * (null once it's over), which takes far longer than a photo's shrinking.
+ *
  * Returns `{ promise, abort }`; `promise` resolves to `{ status,
  * responseText }` for any HTTP response (callers decide what's an error),
- * rejects on a network failure or a caller abort (`AbortError`).
+ * rejects on a network failure, a caller abort (`AbortError`), or a video
+ * too long to fit the maximum video size even compressed (a translated
+ * message, nothing sent - see videoCompress.js).
  */
-export function adaptiveUpload({ file, url, headers = {}, onProgress = () => {} }) {
+export function adaptiveUpload({ file, url, headers = {}, onProgress = () => {}, onCompressProgress = () => {} }) {
 	let cancelled = false;
 	let current = null;
 
+	// `{ body, params }` - a smaller copy to send instead, or null.
+	async function smallerCopy(budget) {
+		if (isVideoFile(file)) return maybeCompressVideo(file, budget, onCompressProgress);
+		const shrunk = await maybeShrinkForUpload(file);
+		return shrunk === file ? null : { body: shrunk, params: {} };
+	}
+
 	const promise = (async () => {
-		let body = await maybeShrinkForUpload(file);
-		let allowSwitch = body === file;
+		const copy = await smallerCopy(await byteBudget());
+		if (copy?.tooLarge) throw tooLargeError(copy.tooLarge);
+		let prepared = copy ?? { body: file, params: {} };
+		let allowSwitch = copy == null;
 		for (;;) {
 			if (cancelled) throw abortError();
-			current = sendOnce(body, allowSwitch);
+			current = sendOnce(prepared, allowSwitch);
 			const result = await current.promise;
 			if (!result.switchTo) return result;
-			body = result.switchTo;
+			prepared = result.switchTo;
 			allowSwitch = false;
 		}
 	})();
 
-	function sendOnce(body, allowSwitch) {
+	function sendOnce({ body, params }, allowSwitch) {
 		const xhr = new XMLHttpRequest();
 		let switchTo = null;
 		let checked = false;
@@ -63,7 +82,7 @@ export function adaptiveUpload({ file, url, headers = {}, onProgress = () => {} 
 		let metering = false;
 
 		const promise = new Promise((resolve, reject) => {
-			xhr.open('POST', url);
+			xhr.open('POST', withParams(url, params));
 			Object.entries(headers).forEach(([name, value]) => xhr.setRequestHeader(name, value));
 
 			const stopMetering = () => {
@@ -101,23 +120,23 @@ export function adaptiveUpload({ file, url, headers = {}, onProgress = () => {} 
 			};
 
 			const form = new FormData();
-			form.append('file', body, file.name);
+			form.append('file', body, body.name);
 			xhr.send(form);
 		});
 
 		async function considerSwitch(total) {
 			const budget = await byteBudget();
 			if (budget == null || total - sent <= budget) return; // finishing still fits the target
-			const shrunk = await maybeShrinkForUpload(file);
-			if (shrunk === file || xhr.readyState === XMLHttpRequest.DONE || cancelled) return;
+			const copy = await smallerCopy(budget);
+			if (!copy || copy.tooLarge || xhr.readyState === XMLHttpRequest.DONE || cancelled) return;
 			const remaining = total - sent;
-			if (shrunk.size >= remaining) return;
+			if (copy.body.size >= remaining) return;
 			console.info(
 				`[adaptive upload] ${file.name}: ${(remaining / 1e6).toFixed(2)} MB still to send at full size - ` +
-					`restarting with the ${(shrunk.size / 1e6).toFixed(2)} MB shrunk copy`,
+					`restarting with the ${(copy.body.size / 1e6).toFixed(2)} MB smaller copy`,
 			);
-			switchTo = shrunk;
-			onProgress(0, shrunk.size);
+			switchTo = copy;
+			onProgress(0, copy.body.size);
 			xhr.abort();
 		}
 
@@ -135,4 +154,16 @@ export function adaptiveUpload({ file, url, headers = {}, onProgress = () => {} 
 
 function abortError() {
 	return new DOMException('Upload aborted', 'AbortError');
+}
+
+function withParams(url, params) {
+	const entries = Object.entries(params);
+	if (entries.length === 0) return url;
+	const query = new URLSearchParams(entries).toString();
+	return url + (url.includes('?') ? '&' : '?') + query;
+}
+
+function tooLargeError({ estimate, limit }) {
+	const mb = (bytes) => Math.round(bytes / (1024 * 1024));
+	return new Error(i18n.t('upload.videoTooLong', { estimate: mb(estimate), limit: mb(limit) }));
 }

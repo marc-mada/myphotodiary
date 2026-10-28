@@ -54,9 +54,10 @@ import { appSettingsApi } from '../api/appSettings';
  * Before any measurement: the Network Information API hint
  * (`navigator.connection`, Chrome/Edge/Android only), else full size.
  *
- * Only JPEG is touched (PNG/GIF/HEIC/video pass through unchanged - no
- * transcoding policy for video, and re-encoding a PNG as JPEG would change
- * its format). A photo already small enough, or whose re-encoded result
+ * Only JPEG is touched here (PNG/GIF/HEIC pass through unchanged -
+ * re-encoding a PNG as JPEG would change its format). Videos have their own
+ * compression since 28/10/2026 (videoCompress.js), driven by the same link
+ * meter and target. A photo already small enough, or whose re-encoded result
  * isn't actually smaller, is sent as-is.
  *
  * EXIF: a canvas re-encode drops all metadata, but the server derives the
@@ -140,22 +141,31 @@ function measuredMbps() {
 	return storedMbps;
 }
 
-// Fetched once per page load; falls back to the default rather than blocking
-// an upload if the settings call fails.
-let targetSecondsPromise = null;
-function targetUploadSeconds() {
-	if (!targetSecondsPromise) {
-		targetSecondsPromise = appSettingsApi
+// Fetched once per page load; falls back to the defaults rather than
+// blocking an upload if the settings call fails. Also read by
+// videoCompress.js (videoCompressionFloor, 28/10/2026).
+let settingsPromise = null;
+export function uploadSettings() {
+	if (!settingsPromise) {
+		settingsPromise = appSettingsApi
 			.get()
-			.then((settings) => settings.targetUploadSeconds || DEFAULT_TARGET_SECONDS)
-			.catch(() => DEFAULT_TARGET_SECONDS);
+			.then((settings) => ({
+				targetUploadSeconds: settings.targetUploadSeconds || DEFAULT_TARGET_SECONDS,
+				videoCompressionFloor: settings.videoCompressionFloor === 1080 ? 1080 : 720,
+				maxVideoSizeBytes: settings.maxVideoSizeBytes || null,
+			}))
+			.catch(() => ({ targetUploadSeconds: DEFAULT_TARGET_SECONDS, videoCompressionFloor: 720, maxVideoSizeBytes: null }));
 	}
-	return targetSecondsPromise;
+	return settingsPromise;
 }
 
-/** Forget the cached target - Admin -> Configure calls this after saving a new one. */
+async function targetUploadSeconds() {
+	return (await uploadSettings()).targetUploadSeconds;
+}
+
+/** Forget the cached settings - Admin -> Configure calls this after saving new ones. */
 export function invalidateTargetUploadSeconds() {
-	targetSecondsPromise = null;
+	settingsPromise = null;
 }
 
 function hintedMbps() {
@@ -240,7 +250,7 @@ const mb = (bytes) => `${(bytes / 1e6).toFixed(2)} MB`;
 // One console line per decision (explicit ask after testing: "the 3rd file
 // was not shrunk" could not be diagnosed after the fact) - visible in the
 // browser's DevTools console.
-function log(file, budget, outcome) {
+export function log(file, budget, outcome) {
 	const mbps = measuredMbps() ?? hintedMbps();
 	console.info(
 		`[adaptive upload] ${file.name} (${mb(file.size)}): link ${mbps == null ? 'unknown' : `${mbps.toFixed(2)} Mbps`}, ` +

@@ -86,4 +86,14 @@ class AppSettingsControllerTest {
 		assertThat(controller.update(new UpdateAppSettingsRequest(null, null, null, null, false)).compactOriginalVideos()).isFalse();
 	}
 
+
+	@Test
+	@org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
+	void videoCompressionFloor_defaultsTo720_onlyAccepts720Or1080() {
+		assertThat(controller.get().videoCompressionFloor()).isEqualTo(720);
+		assertThat(controller.update(new UpdateAppSettingsRequest(null, null, null, null, null, 1080)).videoCompressionFloor()).isEqualTo(1080);
+		assertThatThrownBy(() -> controller.update(new UpdateAppSettingsRequest(null, null, null, null, null, 480)))
+				.isInstanceOf(IllegalArgumentException.class);
+		assertThat(controller.get().videoCompressionFloor()).isEqualTo(1080);
+	}
 }

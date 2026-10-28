@@ -406,14 +406,39 @@ On a normal connection, nothing is changed. A few things to know:
   on the server: it's what
   everyone sees, what gets backed up, and what the editor works on.
   Upload from a fast connection when you want to keep full resolution.
-- Only JPEG photos are made smaller. PNG files and videos are always
-  sent as they are. If your photo software exports PNG (common with raw
+- Only JPEG photos are made smaller. PNG files are always sent as they
+  are (videos have their own compression, see below). If your photo software exports PNG (common with raw
   developers), exporting JPEG at a high quality instead (90–95) gives
   much smaller files with no visible difference.
 - The capture date and GPS location recorded by the camera are kept.
 - The first photo or two of a batch may start at full size while the
   speed is still being measured; if the connection turns out to be slow,
   they're restarted in the smaller size after a few seconds.
+
+**Videos are compressed the same way on a slow connection.** When a
+video would take longer than the same target to upload, your browser
+re-encodes it before sending it — **Compressing clip.mp4… 42%** shows
+below the drop area while it works, then the upload continues as usual.
+It first tries 1080p, then 720p if that's still too heavy; it never goes
+below the lowest resolution an administrator chose (§8.2, 720p by
+default), even if the upload then takes longer. Good to know:
+- As with photos, the compressed video **replaces** the original on the
+  server. Upload from a fast connection when you want to keep the full
+  quality.
+- The date and place the camera recorded are kept.
+- The video is sent unchanged when compressing wouldn't make it clearly
+  smaller (often the case for iPhone/iPad "High Efficiency" videos, which
+  are already compact), when it's an HDR video, when it lasts more than
+  15 minutes, or when your browser can't compress it (an older browser,
+  or a format it can't read).
+- **A video above the maximum video size** (§8.2) is compressed whatever
+  the connection speed, aiming just under that size. A video too long to
+  fit even at the lowest resolution (roughly 12 MB per minute at 720p,
+  so about 1 min 50 s with the default 20 MB limit) is refused at once,
+  without compressing or sending anything, with a message giving its
+  estimated size; the other files carry on.
+- Compressing takes a while on a phone and works one video at a time;
+  keep the page open meanwhile.
 
 Close the popup with the **✕** in its top-right corner once you're done.
 Uploaded files appear in the gallery straight away, and the directory
@@ -623,8 +648,8 @@ no account needed):
 - The **large pin** is the sequence's own location. **Drag it** to where
   the sequence was taken; the new position is saved as soon as you drop
   it, and its coordinates are shown under the map.
-- **Small blue dots** are the pictures of this sequence that carry a GPS
-  position recorded by the camera or phone. They're only there to guide
+- **Small blue dots** are the pictures and videos of this sequence that
+  carry a GPS position recorded by the camera or phone. They're only there to guide
   you — they can't be moved, and pictures without GPS simply have no dot.
 - Where the pin starts: at the sequence's saved location if it has one;
   otherwise at the average position of those GPS dots; otherwise at your
@@ -740,11 +765,14 @@ Two independent forms:
 - **App-wide settings** — for the whole instance, Admin-only (a Writer
   doesn't see this box at all):
   - **Maximum video size (MB)** — larger videos are refused at upload.
-  - **Target average upload time per photo (seconds)** — how long a
-    photo upload is allowed to take before photos are automatically made
-    smaller on a slow connection (§3). A lower value means faster uploads
-    on slow networks but smaller stored photos; a higher value keeps more
-    resolution. 10 seconds by default.
+  - **Target average upload time per photo or video (seconds)** — how
+    long an upload is allowed to take before photos are automatically
+    made smaller and videos compressed on a slow connection (§3). A lower
+    value means faster uploads on slow networks but smaller stored files;
+    a higher value keeps more quality. 10 seconds by default.
+  - **Lowest resolution for videos compressed before upload** — 720p
+    (default) or 1080p: a compressed video never goes below it (§3).
+    1080p keeps more detail but makes uploads on a slow connection longer.
   - **Maximum pictures in a shared search result** — above it, only the
     first ones are shared, with a warning to the person sharing (§6).
     50 by default.
@@ -1108,8 +1136,10 @@ on the device.
 
 1. Then click the **Upload** button which actually
 sends the selected image files. On a slow mobile connection, photos are
-made smaller automatically before being sent, exactly as on desktop —
-see §3 for how it works and what it means for the stored photo.
+made smaller and videos compressed automatically before being sent,
+exactly as on desktop — see §3 for how it works and what it means for the
+stored file. While a video is compressed, the button shows **Compressing
+… %**; keep the screen on and the page open.
 
    If some files are refused (for example a damaged video, one above the
    maximum video size, or a name already used in that sequence), the
@@ -1204,11 +1234,13 @@ Things to know:
   where it landed, and move it if needed (Rename / Move, §2).
 - **Location**: shared photos rarely keep their GPS position (WhatsApp and
   Android remove it).
-- **Videos**: the same rules as Publish apply — H.264 videos only, up to
-  the maximum size set by your administrator. A video is filed by the
-  file's date, not by the date the camera recorded inside it, so a shared
-  video usually lands in the month it was shared. Move it if needed
-  (Rename / Move, §2).
+- **Videos**: the same rules as Publish apply, up to the maximum size set
+  by your administrator. A video is filed by the date the camera recorded
+  inside it, and placed on the map with its recorded location, when the
+  shared file still has them (phone galleries usually keep them if their
+  "keep date and location when sharing" option is on; WhatsApp doesn't).
+  Otherwise it's filed by the file's date, often the day it was shared —
+  move it if needed (Rename / Move, §2).
 - **A file is refused**: the others are still published, and the refused
   ones stay on the page with the reason (see Upload above).
 - **Nothing happens, or an error page, after choosing myPhotoDiary in the
@@ -1264,9 +1296,9 @@ reachable by any signed-in role, not just Admin.
 > in the root directory - rather than left it black - and comment it with 
 > a Welcome message.
 
-> **Uploading from a slow connection**: photos are shrunk automatically
-> to keep uploads fast (§3). If you care about keeping a photo at full
-> resolution, wait until you're on a fast connection (home Wi-Fi) to
+> **Uploading from a slow connection**: photos are shrunk and videos
+> compressed automatically to keep uploads fast (§3). If you care about
+> keeping a photo or video at full quality, wait until you're on a fast connection (home Wi-Fi) to
 > publish it.
 
 > **Language**: unlike the desktop interface (§2.1), mobile has no

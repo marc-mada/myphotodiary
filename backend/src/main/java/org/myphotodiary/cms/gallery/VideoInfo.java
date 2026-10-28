@@ -16,6 +16,7 @@
 
 package org.myphotodiary.cms.gallery;
 
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Set;
 
@@ -27,6 +28,10 @@ import java.util.Set;
  * {@code width}/{@code height} are the stored (coded) ones; a phone's
  * rotation flag doesn't matter here because every limit below is checked
  * on the long and short sides, whatever the orientation.
+ *
+ * {@code recordedAt} and {@code location} (28/10/2026) are what the camera
+ * wrote into the file - the video equivalent of a photo's EXIF date and GPS.
+ * Both {@code null} when absent (see VideoFormatValidator for the tags read).
  */
 public record VideoInfo(
 		String container,
@@ -41,7 +46,17 @@ public record VideoInfo(
 		String pixelFormat,
 		boolean interlaced,
 		boolean hdr,
-		double durationSeconds) {
+		double durationSeconds,
+		/** Recording date as local wall time, {@code null} if the file carries none. */
+		LocalDateTime recordedAt,
+		/** Recording place, {@code null} if the file carries none (never 0/0). */
+		ExifGpsReader.Coordinates location) {
+
+	/** Same video, another recording date and place - see ImportService's ClientVideoMetadata. */
+	public VideoInfo withRecording(LocalDateTime recordedAt, ExifGpsReader.Coordinates location) {
+		return new VideoInfo(container, videoCodec, audioCodec, width, height, frameRate, bitRate, pixelFormat, interlaced, hdr, durationSeconds,
+				recordedAt, location);
+	}
 
 	/** Playback copy box: 1080p, either orientation. */
 	public static final int COPY_LONG_SIDE = 1920;

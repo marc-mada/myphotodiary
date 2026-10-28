@@ -333,7 +333,9 @@ public class DirectoryIndexerService {
 	 * disk) gets a row if ffprobe can read it - any codec since 27/10/2026,
 	 * a playback copy being queued when needed (VideoProcessingService); an
 	 * unreadable one is skipped (logged). The size limit isn't applied: it
-	 * guards uploads, and this file is already on the server. An existing
+	 * guards uploads, and this file is already on the server. A new one is
+	 * dated and placed from its own metadata when it has some (28/10/2026),
+	 * like a photo from its EXIF. An existing
 	 * row keeps its date (an upload may have dated it from the browser, which
 	 * the file itself can't tell again), and its playback state is repaired
 	 * (missing copy, failed job, video stored before option C). Its
@@ -351,7 +353,13 @@ public class DirectoryIndexerService {
 				log.warn("Not indexing video {}/{}: {}", directoryPath, name, e.getMessage());
 				return null;
 			}
-			video = imageRepository.save(new Image(name, directory, exifDateReader.readCaptureDate(file, name, sequenceDefault), MediaType.VIDEO));
+			video = new Image(name, directory,
+					exifDateReader.readCaptureDate(file, name, null, sequenceDefault, null, newVideoInfo.recordedAt()), MediaType.VIDEO);
+			if (newVideoInfo.location() != null) {
+				video.setLatitude(newVideoInfo.location().latitude());
+				video.setLongitude(newVideoInfo.location().longitude());
+			}
+			video = imageRepository.save(video);
 		}
 		if (!storageService.videoThumbnailExists(directoryPath, name)) {
 			try {

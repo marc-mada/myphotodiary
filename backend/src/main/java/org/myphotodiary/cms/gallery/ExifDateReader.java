@@ -141,6 +141,17 @@ public class ExifDateReader {
 	 */
 	public LocalDateTime readCaptureDate(Path imageFile, String originalFilename, LocalDateTime clientLastModified, LocalDateTime sequenceDefaultDate,
 			LocalDateTime fallbackDate) {
+		return readCaptureDate(imageFile, originalFilename, clientLastModified, sequenceDefaultDate, fallbackDate, null);
+	}
+
+	/**
+	 * {@code videoRecordedAt} (28/10/2026): the recording date a video carries
+	 * in its own metadata ({@link VideoInfo#recordedAt()}). A video has no
+	 * EXIF, so this takes EXIF's place at the top of the chain; the sequence
+	 * ceiling still applies to it, as it does to EXIF.
+	 */
+	public LocalDateTime readCaptureDate(Path imageFile, String originalFilename, LocalDateTime clientLastModified, LocalDateTime sequenceDefaultDate,
+			LocalDateTime fallbackDate, LocalDateTime videoRecordedAt) {
 		// Logged at INFO (01/09/2026, added while chasing a real production
 		// report - "Publish into a new sequence" landing on today's date for
 		// a file the user insisted carried a real date) rather than DEBUG:
@@ -154,7 +165,10 @@ public class ExifDateReader {
 		// resolved date for entirely different reasons.
 		String source = "none";
 		LocalDateTime imgDate = null;
-		try (InputStream in = Files.newInputStream(imageFile)) {
+		if (videoRecordedAt != null) {
+			imgDate = videoRecordedAt;
+			source = "VideoMetadata";
+		} else try (InputStream in = Files.newInputStream(imageFile)) {
 			Metadata metadata = ImageMetadataReader.readMetadata(in);
 			ExifSubIFDDirectory exifSubDir = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
 			Date date = null;

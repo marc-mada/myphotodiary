@@ -141,7 +141,9 @@
     "storeInCurrentPathPrefix": "Enregistrer les photos dans : ",
     "sequenceNamePlaceholder": "nom de la séquence",
     "dropHere": "Déposez vos photos ici, ou {{browseAction}}",
-    "browse": "parcourir"
+    "browse": "parcourir",
+    "compressing": "Compression de {{name}}… {{percent}} %",
+    "videoTooLong": "Trop longue pour la taille maximale des vidéos : environ {{estimate}} Mo même compressée, la limite est de {{limit}} Mo."
   },
   "admin": {
     "users": "Utilisateurs",
@@ -193,14 +195,16 @@
     "appWideSettingsHeading": "Réglages globaux",
     "maxVideoSizeMb": "Taille maximale des vidéos (Mo)",
     "appVersion": "myPhotoDiary version {{version}}",
-    "targetUploadSeconds": "Durée moyenne d'envoi visée par photo (secondes)",
+    "targetUploadSeconds": "Durée moyenne d'envoi visée par photo ou vidéo (secondes)",
     "maxShareSize": "Nombre maximum de photos dans un résultat de recherche partagé",
     "allowVideoSharing": "Autoriser le partage des vidéos par lien (diffusées depuis ce serveur à toute personne ayant le lien)",
     "presentation": "Présentation (ordinateur)",
     "onlineCapture": "Capture en ligne (mobile : Photographier et Filmer dans le menu)",
     "compactOriginalVideos": "Compacter les vidéos originales aux formats anciens ou lourds (réencodage en HEVC)",
     "compactOriginalVideosHint": "ProRes, DV, MJPEG, MPEG-2, AVI… sont réencodés en arrière-plan après leur copie de lecture. Définitif : le fichier original est remplacé par un fichier plus petit.",
-    "videoJobs": "Vidéos en attente de traitement : {{waiting}}. En échec : {{failed}}."
+    "videoJobs": "Vidéos en attente de traitement : {{waiting}}. En échec : {{failed}}.",
+    "videoCompressionFloor": "Résolution minimale des vidéos compressées avant l'envoi",
+    "videoCompressionFloorHint": "Une vidéo trop lourde pour la durée d'envoi visée est compressée dans le navigateur, au plus jusqu'à cette résolution. En dessous, l'envoi prend simplement plus de temps."
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "nouveau/chemin/de/répertoire",

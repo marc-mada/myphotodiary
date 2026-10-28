@@ -141,7 +141,9 @@
     "storeInCurrentPathPrefix": "Guardar las fotos en: ",
     "sequenceNamePlaceholder": "nombre de la secuencia",
     "dropHere": "Arrastra y suelta las fotos aquí, o {{browseAction}}",
-    "browse": "explorar"
+    "browse": "explorar",
+    "compressing": "Comprimiendo {{name}}… {{percent}} %",
+    "videoTooLong": "Demasiado largo para el tamaño máximo de vídeo: unos {{estimate}} MB incluso comprimido, el límite es {{limit}} MB."
   },
   "admin": {
     "users": "Usuarios",
@@ -193,14 +195,16 @@
     "appWideSettingsHeading": "Ajustes generales de la aplicación",
     "maxVideoSizeMb": "Tamaño máximo de vídeo (MB)",
     "appVersion": "myPhotoDiary versión {{version}}",
-    "targetUploadSeconds": "Tiempo medio de subida objetivo por foto (segundos)",
+    "targetUploadSeconds": "Tiempo medio de subida objetivo por foto o vídeo (segundos)",
     "maxShareSize": "Número máximo de fotos en un resultado de búsqueda compartido",
     "allowVideoSharing": "Permitir compartir vídeos por enlace (se transmiten desde este servidor a cualquiera que tenga el enlace)",
     "presentation": "Presentación (escritorio)",
     "onlineCapture": "Captura en línea (móvil: Fotografiar y Grabar en el menú)",
     "compactOriginalVideos": "Compactar los vídeos originales en formatos antiguos o pesados (recodificar a HEVC)",
     "compactOriginalVideosHint": "ProRes, DV, MJPEG, MPEG-2, AVI… se recodifican en segundo plano después de su copia de reproducción. Definitivo: el archivo original se sustituye por uno más pequeño.",
-    "videoJobs": "Vídeos pendientes de procesar: {{waiting}}. Con error: {{failed}}."
+    "videoJobs": "Vídeos pendientes de procesar: {{waiting}}. Con error: {{failed}}.",
+    "videoCompressionFloor": "Resolución mínima de los vídeos comprimidos antes de subirlos",
+    "videoCompressionFloorHint": "Un vídeo demasiado pesado para el tiempo de subida objetivo se comprime en el navegador, como mucho hasta esta resolución. Por debajo, la subida simplemente tarda más."
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "nueva/ruta/de/carpeta",

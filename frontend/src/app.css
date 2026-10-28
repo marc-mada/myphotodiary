@@ -2326,6 +2326,12 @@ button.danger {
 	padding: 0.75rem 1rem;
 }
 
+/* A video being compressed before upload (28/10/2026, videoCompress.js). */
+.upload-compressing {
+	margin: 0.25rem 0 0;
+	font-size: 0.9rem;
+}
+
 /* Drag & drop area decoration (01/09/2026, explicit ask) - oblique
    black/yellow hazard stripes, at least 150px tall. Scoped to this
    screen's own uploader (FilePond is only ever mounted here - mobile

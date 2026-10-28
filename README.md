@@ -76,6 +76,26 @@ see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Release Notes
 
+### 2.14.0 — 2026-10-28
+
+- **Videos are dated and placed from what the camera recorded in them**
+  (Android and iPhone/iPad), like photos from their EXIF: they are filed
+  in the month they were filmed, not the month they were uploaded, and
+  show on the sequence geolocation map. Applies to new uploads, Batch
+  Publish and videos dropped on disk when first indexed; videos already
+  in the library are unchanged.
+- **Videos are compressed in the browser on a slow connection**, as photos
+  already were: a video that would take longer than the target upload
+  time is re-encoded to H.264 (1080p, then 720p) before it's sent, keeping
+  its recording date and place. New app-wide setting "Lowest resolution
+  for videos compressed before upload" (720p by default, or 1080p).
+  Videos that wouldn't get clearly smaller (typically iPhone/iPad HEVC),
+  HDR videos and videos over 15 minutes are sent unchanged. A video above
+  the maximum video size is compressed whatever the connection speed, so
+  it can still be accepted; one too long to fit even compressed is
+  refused at once, with its estimated size. On desktop, an upload error
+  now shows its actual reason instead of "Error during upload".
+
 ### 2.13.0 — 2026-10-27
 
 - **Videos in (almost) any format**: iPhone "High Efficiency" (HEVC),

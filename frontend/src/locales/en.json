@@ -141,7 +141,9 @@
     "storeInCurrentPathPrefix": "Store photos in: ",
     "sequenceNamePlaceholder": "sequence name",
     "dropHere": "Drag & drop photos here, or {{browseAction}}",
-    "browse": "browse"
+    "browse": "browse",
+    "compressing": "Compressing {{name}}… {{percent}}%",
+    "videoTooLong": "Too long for the maximum video size: about {{estimate}} MB even compressed, the limit is {{limit}} MB."
   },
   "admin": {
     "users": "Users",
@@ -193,14 +195,16 @@
     "appWideSettingsHeading": "App-wide settings",
     "maxVideoSizeMb": "Maximum video size (MB)",
     "appVersion": "myPhotoDiary version {{version}}",
-    "targetUploadSeconds": "Target average upload time per photo (seconds)",
+    "targetUploadSeconds": "Target average upload time per photo or video (seconds)",
     "maxShareSize": "Maximum pictures in a shared search result",
     "allowVideoSharing": "Allow sharing videos by link (streamed from this server to anyone who has the link)",
     "presentation": "Presentation (desktop)",
     "onlineCapture": "Online capture (mobile: Camera and Film in the menu)",
     "compactOriginalVideos": "Compact original videos in old or heavy formats (re-encode to HEVC)",
     "compactOriginalVideosHint": "ProRes, DV, MJPEG, MPEG-2, AVI… are re-encoded in the background after their playback copy. Permanent: the original file is replaced by a smaller one.",
-    "videoJobs": "Videos waiting for processing: {{waiting}}. Failed: {{failed}}."
+    "videoJobs": "Videos waiting for processing: {{waiting}}. Failed: {{failed}}.",
+    "videoCompressionFloor": "Lowest resolution for videos compressed before upload",
+    "videoCompressionFloorHint": "A video too heavy for the target upload time is compressed in the browser, down to this resolution at most. Below it, the upload just takes longer."
   },
   "indexManagement": {
     "newDirectoryPlaceholder": "new/directory/path",

@@ -100,6 +100,22 @@ public class AppSettingsService {
 		return settings;
 	}
 
+	/**
+	 * Lowest resolution (short side) a video may be compressed to in the
+	 * browser before upload (28/10/2026, explicit ask, V20, default 720) -
+	 * not enforced server-side: the browser reads it and never goes below it
+	 * (videoCompress.js), even when the upload then exceeds the target time.
+	 */
+	@Transactional
+	public AppSettings updateVideoCompressionFloor(int videoCompressionFloor) {
+		if (videoCompressionFloor != 720 && videoCompressionFloor != 1080) {
+			throw new IllegalArgumentException("videoCompressionFloor must be 720 or 1080, got " + videoCompressionFloor);
+		}
+		AppSettings settings = get();
+		settings.setVideoCompressionFloor(videoCompressionFloor);
+		return settings;
+	}
+
 	public static final int MIN_MAX_SHARE_SIZE = 1;
 	public static final int MAX_MAX_SHARE_SIZE = 1000;
 

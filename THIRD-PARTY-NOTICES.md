@@ -32,6 +32,7 @@ cd frontend && npm ls --omit=dev --all
 | [html-parse-stringify](https://github.com/i18next/html-parse-stringify) | 4.0.1 | MIT |
 | [@babel/runtime](https://github.com/babel/babel) | 7.29.7 | MIT |
 | [leaflet](https://github.com/Leaflet/Leaflet) | 1.9.4 | BSD-2-Clause |
+| [mediabunny](https://github.com/Vanilagy/mediabunny) | 1.61.3 | MPL-2.0 (included unmodified; source available from the project) |
 
 Icons drawn in the frontend's own code reproduce glyphs from two icon sets:
 

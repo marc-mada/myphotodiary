@@ -1159,7 +1159,8 @@ User's Manual's Admin section for where to find each one.
 | Setting | Scope | Where | Default |
 |---|---|---|---|
 | Maximum video upload size | Whole instance | Admin → Configure, "App-wide settings" | 20 MB |
-| Target average upload time per photo — above it, photos are made smaller in the browser before upload on a slow connection (never below 2400 px on the long side) | Whole instance | Same box as above | 10 seconds |
+| Target average upload time per photo or video — above it, photos are made smaller and videos compressed in the browser before upload on a slow connection (never below 2400 px on the long side for photos) | Whole instance | Same box as above | 10 seconds |
+| Lowest resolution for videos compressed before upload | Whole instance | Same box as above | 720p |
 | Maximum pictures in a shared search result — above it, the first ones are shared and the person sharing is warned | Whole instance | Same box as above | 50 |
 | Slideshow delay | Per user | Admin → Configure, "User settings" (a WRITER can only edit their own; an ADMIN can pick any user) | 5 seconds |
 | Post-it fade delay | Per user | Same panel as above | 8 seconds |
