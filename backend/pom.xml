@@ -13,7 +13,7 @@
 
 	<groupId>org.myphotodiary</groupId>
 	<artifactId>myphotodiary-backend</artifactId>
-	<version>2.14.0</version>
+	<version>2.15.0</version>
 	<packaging>jar</packaging>
 
 	<!-- Real bug found inspecting the built .deb's own control file
@@ -237,6 +237,23 @@
 										     the moment they're actually needed, but are never wired
 										     to any unit/automation - see their own comments for why
 										     restore specifically stays a manual, supervised action. -->
+										<!-- Welcome photo/video (29/10/2026) - whatever file(s) sit in
+										     src/deb/welcome/ are shipped here; postinst copies them to
+										     the storage root on a first install only (see its own
+										     comment). Missing/empty folder: nothing shipped. -->
+										<data>
+											<src>${project.basedir}/src/deb/welcome</src>
+											<type>directory</type>
+											<missingSrc>ignore</missingSrc>
+											<excludes>README.md,.gitkeep,.DS_Store</excludes>
+											<mapper>
+												<type>perm</type>
+												<prefix>/usr/share/myphotodiary-backend/welcome</prefix>
+												<filemode>644</filemode>
+												<user>root</user>
+												<group>root</group>
+											</mapper>
+										</data>
 										<data>
 											<src>${project.basedir}/src/deb/scripts/backup-images.sh</src>
 											<type>file</type>

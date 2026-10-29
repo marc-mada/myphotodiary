@@ -12,6 +12,10 @@ Yet, our photos are often scattered across phones, social networks, and cloud se
 
 This self-hosted photo management platform lets you organize, preserve, and share your personal photos and videos in a space you control. Bring your loved ones together around the moments that matter, without relying on public social networks or entrusting your entire collection to commercial photo platforms.
 
+<p align="center">
+  <img src="docs/images/desktop-gallery-after-install-half.png" alt="The myPhotoDiary Gallery, with its directory tree, picture viewer and film strip">
+</p>
+
 ## Everything you need to manage and share your memories
 
 Designed for families and small groups of friends, this self-hosted web application makes it easy to store, browse, organize, and share collections of photos and short videos.
@@ -75,6 +79,17 @@ myPhotoDiary bundles third-party components under their own licenses —
 see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Release Notes
+
+### 2.15.0 — 2026-10-29
+
+- **Welcome photo**: a first installation of the Debian packages puts a
+  default welcome photo, `welcome.jpg`, in the Root folder, so the
+  Gallery doesn't open on an empty screen. Replace it with your own photo
+  or video from the app (User's Manual §14). Upgrades never bring it back,
+  and nothing is copied when the storage folder already holds files. The
+  Docker image has no welcome photo.
+- Documentation: new and updated screenshots in the README and the
+  User's Manual.
 
 ### 2.14.0 — 2026-10-28
 

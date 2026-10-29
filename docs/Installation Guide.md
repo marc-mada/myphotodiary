@@ -323,6 +323,10 @@ Installing the backend package automatically:
 - creates a dedicated `myphotodiary` system user and group;
 - creates `/var/lib/myphotodiary-backend/{db,images,staging}`, owned by
   that user;
+- puts a welcome photo, `welcome.jpg`, at the root of the photo storage
+  (the folder set by `MPD_STORAGE_ROOT`), so the Gallery doesn't open on
+  an empty screen. This happens on the first install only, and only if
+  that folder has no files in it yet; see §7 for how to replace it;
 - installs the systemd service, **but deliberately does not start it
   yet** — see §5.3, it needs two secrets set first.
 
@@ -611,6 +615,21 @@ start, otherwise `admin`.
 3. From there, see the [User's Manual](User's%20Manual.md) for a guided
    tour: creating other user accounts and assigning them roles, and
    publishing your first pictures.
+
+**The welcome photo.** With the Debian packages, the Gallery opens on a
+welcome photo, `welcome.jpg`, stored at the root of the photo storage
+(`/var/lib/myphotodiary-backend/images/welcome.jpg` by default). It's
+yours to keep, comment, replace or delete. Replace it from the app: in
+the Gallery, select **Root** in the directory tree, publish your own
+photo or video there (**Publish pictures** with "Sort by date and create
+a new sequence" unchecked), then delete `welcome.jpg` with the **Delete**
+button of the control bar. The User's Manual, §14, has the details.
+Don't swap the file on the server instead: once the Gallery has been
+opened, the root folder is indexed, and a file changed there by hand
+isn't picked up.
+
+Upgrading the packages never puts `welcome.jpg` back (§8.1): whatever you
+did with it stays. The Docker image doesn't add a welcome photo.
 
 ## 8. Upgrading
 

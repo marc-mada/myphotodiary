@@ -78,6 +78,15 @@ between them manually; it's decided each time the app loads.
 <figcaption>Sign-in screen, mobile</figcaption>
 </figure>
 
+On a new installation, the Gallery opens on a default welcome photo,
+stored in the **Root** folder of the directory tree. Replace it with
+your own photo or video (see the "Welcome photo" tip, §14).
+
+<figure>
+<img src="images/desktop-gallery-after-install.png" alt="The Gallery right after installation, showing the default welcome photo">
+<figcaption>The Gallery right after installation, with the default welcome photo</figcaption>
+</figure>
+
 ## 2. Desktop: Gallery Screen
 
 ### 2.1 Layout: directory tree, viewer, and filmstrip
@@ -511,7 +520,7 @@ result further, on top of the text/tags match: *Videos* with the text
 "Camargue" gives the Camargue videos only. Leave every filter empty and
 nothing is searched at all.
 
-Above the picture, the match count ("1 match" in the screenshot above)
+Above the picture, the match count ("3 matches" in the screenshot above)
 shows how many pictures the current filters found. The viewer itself
 works like the Gallery screen (§2.2), with its own set of buttons in the
 control bar, from left to right:
@@ -1292,9 +1301,19 @@ reachable by any signed-in role, not just Admin.
 ## 14. Tips
 
 
-> **Root image**: To personalize your site, it is good to store a "Root image"
-> in the root directory - rather than left it black - and comment it with 
-> a Welcome message.
+> **Welcome photo**: the Gallery opens on the photo stored in the
+> **Root** folder of the directory tree. A new installation comes with a
+> default one, `welcome.jpg` (screenshot in §1). Give it a comment with a welcome message
+> (§2.3), or replace it with a photo or video of your own:
+> 1. In the Gallery, select **Root** in the directory tree.
+> 2. Click **Publish pictures**, untick "Sort by date and create a new
+>    sequence" (the destination then reads **Store photos in: Root**),
+>    and drop your photo or video (§3).
+> 3. Select `welcome.jpg` in the filmstrip and delete it with the
+>    **Delete** button of the control bar (§2.2). Deleting needs the
+>    Admin role.
+>
+> Upgrades never bring `welcome.jpg` back.
 
 > **Uploading from a slow connection**: photos are shrunk and videos
 > compressed automatically to keep uploads fast (§3). If you care about

@@ -16,6 +16,22 @@ case "$1" in
 		mkdir -p /var/lib/myphotodiary-backend/db /var/lib/myphotodiary-backend/images /var/lib/myphotodiary-backend/staging
 		chown -R myphotodiary:myphotodiary /var/lib/myphotodiary-backend
 
+		# Welcome photo/video (29/10/2026) - copied to the storage root on a
+		# first install only ($2, the previously configured version, is empty).
+		# An upgrade, or a reinstall after `apt remove`, never puts it back, so
+		# the user can replace or delete it. Also skipped when the storage root
+		# already holds files (an existing library pointed at by a custom
+		# MPD_STORAGE_ROOT).
+		if [ -z "$2" ] && [ -d /usr/share/myphotodiary-backend/welcome ]; then
+			storage_root=$(sed -n 's/^MPD_STORAGE_ROOT=//p' /etc/myphotodiary-backend/myphotodiary-backend.env 2>/dev/null | tail -1)
+			storage_root=${storage_root:-/var/lib/myphotodiary-backend/images}
+			if [ -d "$storage_root" ] && [ -z "$(find "$storage_root" -maxdepth 1 -type f ! -name '.*' | head -1)" ]; then
+				for f in /usr/share/myphotodiary-backend/welcome/*; do
+					[ -f "$f" ] && install -o myphotodiary -g myphotodiary -m 644 "$f" "$storage_root/"
+				done
+			fi
+		fi
+
 		# The env file itself is owned/installed as myphotodiary:myphotodiary
 		# by the package's own data mapping, but that user didn't exist at
 		# unpack time on a first install - fixed up here now that it does.
