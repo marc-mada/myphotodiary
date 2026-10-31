@@ -512,12 +512,18 @@ separate results grid of its own.
   native date picker.
 - **Type** — *All* (default), *Photos* or *Videos*: only photos, or only
   videos. On its own, *Videos* lists every video you can see.
+- **Group** — *All groups* (default), *public*, then each other group you
+  belong to (an administrator sees every group): only the pictures of
+  sequences in that group (a sequence's group is set in its own panel,
+  §2.3; groups and roles are explained in §8.1). On its own, it lists
+  every picture of that group. Search never shows pictures from groups
+  you don't belong to, whichever value is chosen.
 
 How the filters combine: **Search text** and **Tags** are alternatives
 to each other — a picture matches if *either* one matches, not only if
-both do. **Minimum rating**, the date range and **Type** then narrow that
-result further, on top of the text/tags match: *Videos* with the text
-"Camargue" gives the Camargue videos only. Leave every filter empty and
+both do. **Minimum rating**, the date range, **Type** and **Group** then
+narrow that result further, on top of the text/tags match: *Videos* with
+the text "Camargue" gives the Camargue videos only. Leave every filter empty and
 nothing is searched at all.
 
 Above the picture, the match count ("3 matches" in the screenshot above)
@@ -719,9 +725,10 @@ removed with its own button; the primary one can't be removed directly
 > create a separate group for a one-off event like a wedding, and admit
 > a wider circle of people to view and contribute pictures to *that*
 > group specifically, without giving them access to the rest of your
-> collection — typing a group name that doesn't exist yet, either here
-> or in the sequence's own **Group** field (§2.3), creates it on the
-> spot.
+> collection. Typing a group name that doesn't exist yet here, in a
+> user's role assignments (or as a new user's primary group), creates it
+> on the spot; a sequence's own **Group** field (§2.3) then lists it, but
+> only offers groups that already exist.
 
 What each role allows, within the group it's assigned to:
 - **Admin** — full control: publish, edit, delete, reassign, manage
@@ -1267,14 +1274,13 @@ Things to know:
 
 Reached from the hamburger menu's **Search** entry (§9.3), this is a
 dedicated full-screen form with the same filters as the desktop Search
-screen (§5) — free text, tags, minimum rating, a date range and the
-type (photos or videos) — and the same rules about how they combine:
-text and tags act as alternatives to each other, rating, dates and type
-narrow the result further,
-and a text search still needs at least 4 characters to count. Tapping
-**Search** with every filter left empty briefly shows a reminder to
-fill something in, rather than running an unfiltered search over the
-whole collection.
+screen (§5) — free text, tags, minimum rating, a date range, the type
+(photos or videos) and the group — and the same rules about how they
+combine: text and tags act as alternatives to each other, rating, dates,
+type and group narrow the result further, and a text search still
+needs at least 4 characters to count. Tapping **Search** with every
+filter left empty briefly shows a reminder to fill something in,
+rather than running an unfiltered search over the whole collection.
 
 Unlike desktop, there's no results grid of its own here: tapping
 **Search** fetches every matching picture up front, then hands them

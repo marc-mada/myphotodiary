@@ -39,6 +39,22 @@ if [ ! -r /data/staging ] || [ ! -x /data/staging ]; then
 	exit 1
 fi
 
+# Welcome photo - first start only, i.e. no database yet. Once the database
+# exists it's never copied again, so it can be replaced or deleted. Also
+# skipped when the photo folder already holds anything, files or folders
+# (an existing library).
+db_path="${MPD_DB_PATH:-/data/db/myphotodiary}"
+storage_root="${MPD_STORAGE_ROOT:-/data/images}"
+if [ ! -e "${db_path}.properties" ] && [ ! -e "${db_path}.script" ] \
+	&& [ -d /opt/myphotodiary/welcome ] && [ -d "$storage_root" ] \
+	&& [ -z "$(find "$storage_root" -mindepth 1 -maxdepth 1 ! -name '.*' | head -1)" ]; then
+	for f in /opt/myphotodiary/welcome/*; do
+		if [ -f "$f" ]; then
+			cp "$f" "$storage_root/"
+		fi
+	done
+fi
+
 domain="${MPD_DOMAIN:-}"
 https_mode="${MPD_HTTPS:-on}"
 
@@ -55,7 +71,8 @@ if [ "$https_mode" = "off" ]; then
 	}"
 	mode_text="HTTPS off (plain HTTP on port 80, behind another HTTPS web server)"
 elif [ -n "$domain" ]; then
-	CADDY_SITE_ADDRESS="$(echo "$domain" | tr -s ' ' ',' | sed 's/,$//')"
+	# Caddy wants ", " (comma AND space) between several site addresses.
+	CADDY_SITE_ADDRESS="$(echo "$domain" | xargs | sed 's/ /, /g')"
 	acme_ca="${MPD_ACME_CA:-}"
 	if [ "$acme_ca" = "staging" ]; then
 		acme_ca="https://acme-staging-v02.api.letsencrypt.org/directory"
@@ -73,8 +90,15 @@ elif [ -n "$domain" ]; then
 	fi
 else
 	hostnames="${MPD_LOCAL_HOSTNAMES:-localhost}"
-	CADDY_SITE_ADDRESS="$(echo "$hostnames" | tr -s ' ' '\n' | sed 's#^#https://#' | paste -sd, -)"
+	CADDY_SITE_ADDRESS="$(echo "$hostnames" | xargs -n1 | sed 's#^#https://#' | paste -sd, - | sed 's/,/, /g')"
 	CADDY_TLS="tls internal"
+	# A browser opening https://<IP address> sends no server name, and Caddy
+	# only sees the container's own address - so tell it which certificate
+	# to use then (the first IP address listed).
+	first_ip="$(echo "$hostnames" | xargs -n1 | grep -E '^[0-9.]+$|:' | head -1 || true)"
+	if [ -n "$first_ip" ]; then
+		CADDY_GLOBAL_OPTIONS="default_sni ${first_ip}"
+	fi
 	mode_text="local certificate for $hostnames"
 fi
 export CADDY_GLOBAL_OPTIONS CADDY_SITE_ADDRESS CADDY_TLS

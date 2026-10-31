@@ -44,8 +44,11 @@ export const shareApi = {
 	// of these criteria on the server ({id, token, matchCount, sharedCount,
 	// truncated, maxShareSize}, see SharedSearchService); the public view
 	// lists the pictures still available, each with its sequenceDescription.
-	shareSearch: ({ attributeNames, minRating, fromDate, toDate, text, mediaType }) =>
-		apiFetch('/api/search-shares', { method: 'POST', body: { attributeNames, minRating, fromDate, toDate, text, mediaType: mediaType || null } }),
+	shareSearch: ({ attributeNames, minRating, fromDate, toDate, text, mediaType, group }) =>
+		apiFetch('/api/search-shares', {
+			method: 'POST',
+			body: { attributeNames, minRating, fromDate, toDate, text, mediaType: mediaType || null, group: group || null },
+		}),
 
 	getPublicSearchShare: (sharedSearchId, token) => publicFetch(`/api/public/search-shares/${sharedSearchId}?token=${encodeURIComponent(token)}`),
 };

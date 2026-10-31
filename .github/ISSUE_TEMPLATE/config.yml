@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Installation Guide
+    url: https://github.com/marc-mada/myphotodiary/blob/main/docs/Installation%20Guide.md
+    about: Installing, upgrading, backups and troubleshooting.
+  - name: User's Manual
+    url: https://github.com/marc-mada/myphotodiary/blob/main/docs/User's%20Manual.md
+    about: Using myPhotoDiary day to day, on desktop or mobile.

@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest something new or a change to an existing feature.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        myPhotoDiary is maintained by one person, so not every idea can be
+        built. Explaining the need behind the request helps the most.
+  - type: textarea
+    id: need
+    attributes:
+      label: What are you trying to do?
+      description: The situation and the need, rather than a specific solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could myPhotoDiary help?
+      description: Your idea of how it could work, if you have one.
+  - type: dropdown
+    id: screens
+    attributes:
+      label: Which screens?
+      multiple: true
+      options:
+        - Desktop
+        - Mobile
+        - Administration
+        - Installation / server

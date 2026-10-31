@@ -1107,6 +1107,30 @@ class GalleryServiceTest {
 	}
 
 	@Test
+	void search_group_isAHardFilter_neverWidensReadableGroups_andCountsAsACriterionOnItsOwn() throws IOException {
+		// 31/10/2026, explicit ask: a "Group" criterion on the desktop search
+		// screen - only that group's pictures, ANDed like the media type.
+		String otherGroup = "search-group-filter-" + System.nanoTime();
+		userService.addRoleAssignment("gallery-test-admin", new CreateRoleAssignmentRequest(otherGroup, "ADMIN"));
+		DirectoryResponse otherDirectory = galleryService.createDirectory(auth, new CreateDirectoryRequest("2026/08/grouped-" + Long.toString(System.nanoTime(), 36), otherGroup));
+		ImageResponse publicImage = galleryService.uploadImage(auth, directoryId, jpegFile("group-public.jpg"));
+		ImageResponse otherImage = galleryService.uploadImage(auth, otherDirectory.id(), jpegFile("group-other.jpg"));
+
+		assertThat(galleryService.search(auth, null, null, null, null, null, null, otherGroup, 0, 1000).images())
+				.extracting(ImageResponse::id).contains(otherImage.id()).doesNotContain(publicImage.id());
+		assertThat(galleryService.search(auth, null, null, null, null, null, null, "public", 0, 1000).images())
+				.extracting(ImageResponse::id).contains(publicImage.id()).doesNotContain(otherImage.id());
+		assertThat(GalleryService.hasSearchCriteria(null, null, null, null, null, null, otherGroup)).isTrue();
+		assertThat(GalleryService.hasSearchCriteria(null, null, null, null, null, null, " ")).isFalse();
+
+		// Naming a group the caller can't browse matches nothing - it narrows
+		// the caller's own readable groups, never widens them.
+		userService.createUser(new CreateUserRequest("public-only-group-searcher", "Public Only", "x", "public", "READER"));
+		Authentication publicOnly = new UsernamePasswordAuthenticationToken("public-only-group-searcher", null);
+		assertThat(galleryService.search(publicOnly, null, null, null, null, null, null, otherGroup, 0, 1000).images()).isEmpty();
+	}
+
+	@Test
 	void createDirectory_duplicatePath_throwsConflict() {
 		assertThatThrownBy(() -> galleryService.createDirectory(auth, new CreateDirectoryRequest(
 				galleryService.listDirectories().stream().filter(d -> d.id().equals(directoryId)).findFirst().orElseThrow().path(), null)))

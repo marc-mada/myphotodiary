@@ -2266,7 +2266,8 @@ button.danger {
 .search-attributes,
 .search-min-rating,
 .search-date-bound,
-.search-media-type {
+.search-media-type,
+.search-group {
 	display: flex;
 	flex-direction: column;
 	gap: 0.25rem;
@@ -3019,6 +3020,25 @@ div.mobile-mosaic-thumb-img {
 	border-radius: 4px;
 	background: rgb(40, 40, 40);
 	color: rgb(220, 220, 220);
+}
+
+/* Two Search criteria side by side (31/10/2026, explicit ask). min-width:0
+   lets a native date input shrink to its half of a narrow phone screen
+   instead of overflowing it. */
+.mobile-search-row {
+	display: flex;
+	gap: 0.75rem;
+}
+
+.mobile-search-row > label {
+	flex: 1;
+	min-width: 0;
+}
+
+.mobile-search-row input,
+.mobile-search-row select {
+	width: 100%;
+	min-width: 0;
 }
 
 .mobile-attribute-checklist {

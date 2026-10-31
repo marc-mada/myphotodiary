@@ -545,7 +545,7 @@ address used for share-link previews is derived from `MPD_DOMAIN`.
 | Setting | What the container does | When to use it |
 |---|---|---|
 | `MPD_DOMAIN=photos.example.com` | Gets and renews a Let's Encrypt certificate for that name; redirects HTTP to HTTPS | A public site (§6.1's requirements) |
-| *(no `MPD_DOMAIN`)* | Uses a certificate from Caddy's own local authority, for the names in `MPD_LOCAL_HOSTNAMES` (default `localhost`; add the machine's local address or name, separated by spaces) | Trying it out, or a home-network-only instance. Browsers warn until you trust that authority's root certificate, `caddy/caddy/pki/authorities/local/root.crt` in the data folder |
+| *(no `MPD_DOMAIN`)* | Uses a certificate from Caddy's own local authority, for the names in `MPD_LOCAL_HOSTNAMES` (default `localhost`; add the machine's local address or name, separated by spaces; when opening the app by IP address, only the first IP address listed works) | Trying it out, or a home-network-only instance. Browsers warn until you trust that authority's root certificate, `caddy/caddy/pki/authorities/local/root.crt` in the data folder |
 | `MPD_HTTPS=off` | Plain HTTP on port 80 | Only behind another web server that handles HTTPS (below) |
 
 Signing in requires the browser to use HTTPS, so `MPD_HTTPS=off` without
@@ -616,9 +616,11 @@ start, otherwise `admin`.
    tour: creating other user accounts and assigning them roles, and
    publishing your first pictures.
 
-**The welcome photo.** With the Debian packages, the Gallery opens on a
+**The welcome photo.** On a new installation, the Gallery opens on a
 welcome photo, `welcome.jpg`, stored at the root of the photo storage
-(`/var/lib/myphotodiary-backend/images/welcome.jpg` by default). It's
+(`/var/lib/myphotodiary-backend/images/welcome.jpg` by default with the
+Debian packages, `images/welcome.jpg` in the folder mounted on `/data`
+with Docker). It's
 yours to keep, comment, replace or delete. Replace it from the app: in
 the Gallery, select **Root** in the directory tree, publish your own
 photo or video there (**Publish pictures** with "Sort by date and create
@@ -628,8 +630,11 @@ Don't swap the file on the server instead: once the Gallery has been
 opened, the root folder is indexed, and a file changed there by hand
 isn't picked up.
 
-Upgrading the packages never puts `welcome.jpg` back (§8.1): whatever you
-did with it stays. The Docker image doesn't add a welcome photo.
+Upgrading never puts `welcome.jpg` back (§8): whatever you did with it
+stays. The packages copy it on their first install only; the Docker image
+copies it on the container's first start only, when there's no database
+yet. In both cases nothing is copied if the photo folder already has
+files in it (an existing library).
 
 ## 8. Upgrading
 

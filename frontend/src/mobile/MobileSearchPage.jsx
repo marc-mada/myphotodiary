@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { groupApi, meApi } from '../api/navigation';
 import { hasSearchCriteria, MIN_TEXT_SEARCH_LENGTH } from '../gallery/searchCriteria';
 import { StarRating } from '../gallery/StarRating';
 import { MobileIcon } from './MobileIcon';
@@ -67,6 +68,10 @@ export function MobileSearchPage({ allAttributes, onSearch, onHome, onLogout }) 
 	const [toDate, setToDate] = useState('');
 	// Photos or videos only (15/10/2026) - '' for both, else 'IMAGE'/'VIDEO'.
 	const [mediaType, setMediaType] = useState('');
+	// One group's pictures only (31/10/2026, explicit ask - same filter as
+	// desktop's SearchScreen): '' for all the groups the user can browse.
+	const [group, setGroup] = useState('');
+	const [readableGroupNames, setReadableGroupNames] = useState([]);
 	const [error, setError] = useState(null);
 	const reportError = useForbiddenAwareError(setError);
 	const [searching, setSearching] = useState(false);
@@ -77,6 +82,45 @@ export function MobileSearchPage({ allAttributes, onSearch, onHome, onLogout }) 
 			if (criteriaMessageTimeoutRef.current != null) window.clearTimeout(criteriaMessageTimeoutRef.current);
 		};
 	}, []);
+
+	// Every group for an admin, otherwise the groups the user holds any role
+	// in (any role can browse) - same resolution as desktop's SearchScreen.
+	useEffect(() => {
+		meApi
+			.get()
+			.then((me) =>
+				me.primaryRoleName === 'ADMIN'
+					? groupApi.list().then((groups) => groups.map((g) => g.groupName))
+					: meApi.groups().then((groups) => [...new Set(groups.map((g) => g.groupName))]),
+			)
+			.then(setReadableGroupNames)
+			.catch(reportError);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+	const otherGroupNames = readableGroupNames.filter((name) => name !== 'public').sort((a, b) => a.localeCompare(b));
+
+	// Since/Till (31/10/2026, real bug reported on a phone): the two fields
+	// used to limit each other with min/max. With Till set and Since empty,
+	// Android's date picker still opened on today and let a later date be
+	// picked, which the browser then turned into a bogus year-0001 value.
+	// No min/max any more: picking a Since after Till (or a Till before
+	// Since) moves the other date along instead. A year before 1800 can't
+	// be a photo date - such a value is ignored rather than searched for.
+	function isPlausibleDate(value) {
+		return value === '' || Number(value.slice(0, 4)) >= 1800;
+	}
+
+	function handleFromDateChange(value) {
+		if (!isPlausibleDate(value)) return;
+		setFromDate(value);
+		if (value && toDate && value > toDate) setToDate(value);
+	}
+
+	function handleToDateChange(value) {
+		if (!isPlausibleDate(value)) return;
+		setToDate(value);
+		if (value && fromDate && value < fromDate) setFromDate(value);
+	}
 
 	function toggleAttribute(name) {
 		setSelectedAttributes((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
@@ -109,6 +153,7 @@ export function MobileSearchPage({ allAttributes, onSearch, onHome, onLogout }) 
 			fromDate: fromDate || null,
 			toDate: toDate || null,
 			mediaType: mediaType || null,
+			group: group || null,
 			// Below the minimum, not a criterion at all (explicit ask,
 			// 10/09/2026) - same threshold desktop's own debounce applies,
 			// now enforced here too rather than left for the backend to
@@ -148,24 +193,42 @@ export function MobileSearchPage({ allAttributes, onSearch, onHome, onLogout }) 
 				{t('mobile.searchText')}
 				<input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('mobile.searchTextPlaceholder')} />
 			</label>
+			{/* Two fields per row (31/10/2026, explicit ask): Since/Till, then
+			    rating/type, then the group on its own row below. */}
+			<div className="mobile-search-row">
+				<label>
+					{t('mobile.since')}
+					<input type="date" value={fromDate} onChange={(e) => handleFromDateChange(e.target.value)} />
+				</label>
+				<label>
+					{t('mobile.till')}
+					<input type="date" value={toDate} onChange={(e) => handleToDateChange(e.target.value)} />
+				</label>
+			</div>
+			<div className="mobile-search-row">
+				<label>
+					{t('mobile.minimumRating')}
+					<StarRating rating={minRating === '' ? -1 : Number(minRating)} onChange={handleMinRatingClick} />
+				</label>
+				<label>
+					{t('search.mediaType')}
+					<select value={mediaType} onChange={(e) => setMediaType(e.target.value)}>
+						<option value="">{t('search.mediaTypeAll')}</option>
+						<option value="IMAGE">{t('search.mediaTypeImage')}</option>
+						<option value="VIDEO">{t('search.mediaTypeVideo')}</option>
+					</select>
+				</label>
+			</div>
 			<label>
-				{t('mobile.since')}
-				<input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} max={toDate || undefined} />
-			</label>
-			<label>
-				{t('mobile.till')}
-				<input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} min={fromDate || undefined} />
-			</label>
-			<label>
-				{t('mobile.minimumRating')}
-				<StarRating rating={minRating === '' ? -1 : Number(minRating)} onChange={handleMinRatingClick} />
-			</label>
-			<label>
-				{t('search.mediaType')}
-				<select value={mediaType} onChange={(e) => setMediaType(e.target.value)}>
-					<option value="">{t('search.mediaTypeAll')}</option>
-					<option value="IMAGE">{t('search.mediaTypeImage')}</option>
-					<option value="VIDEO">{t('search.mediaTypeVideo')}</option>
+				{t('search.group')}
+				<select value={group} onChange={(e) => setGroup(e.target.value)}>
+					<option value="">{t('search.groupAll')}</option>
+					<option value="public">public</option>
+					{otherGroupNames.map((name) => (
+						<option key={name} value={name}>
+							{name}
+						</option>
+					))}
 				</select>
 			</label>
 			<fieldset className="mobile-attribute-checklist">

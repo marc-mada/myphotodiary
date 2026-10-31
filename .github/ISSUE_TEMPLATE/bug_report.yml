@@ -1,0 +1,67 @@
+name: Bug report
+description: Something doesn't work as described in the documentation.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. The Installation
+        Guide has a Troubleshooting chapter (§11) that may already cover it.
+
+        **Don't paste passwords, secrets, private host names or photos of
+        people** in this public issue. Replace them with placeholders.
+  - type: input
+    id: version
+    attributes:
+      label: myPhotoDiary version
+      description: Shown in Admin → Configure, under the global settings.
+      placeholder: "2.15.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation method
+      options:
+        - Docker image
+        - Debian packages
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Server
+      description: Operating system and processor type (Intel or ARM), and the web server in front if it isn't the bundled Caddy.
+      placeholder: "Ubuntu 24.04, Intel"
+  - type: input
+    id: client
+    attributes:
+      label: Device and browser
+      description: Desktop or mobile screens, which device, which browser.
+      placeholder: "Android phone, Chrome"
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the Gallery
+        2. Select a sequence
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Docker: `docker logs myphotodiary`. Debian packages:
+        `journalctl -u myphotodiary-backend -n 200`. Browser errors: the
+        developer console. Only the part around the problem, please.
+      render: text

@@ -281,7 +281,14 @@ public class GalleryService {
 	@Transactional(readOnly = true)
 	public ImageSearchResponse search(Authentication authentication, List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate,
 			String text, MediaType mediaType, int page, int pageSize) {
-		List<Image> filtered = searchMatches(authentication, attributeNames, minRating, fromDate, toDate, text, mediaType);
+		return search(authentication, attributeNames, minRating, fromDate, toDate, text, mediaType, null, page, pageSize);
+	}
+
+	/** {@code groupName} (31/10/2026): one group's pictures only; {@code null} for all - see {@link #searchMatches}. */
+	@Transactional(readOnly = true)
+	public ImageSearchResponse search(Authentication authentication, List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate,
+			String text, MediaType mediaType, String groupName, int page, int pageSize) {
+		List<Image> filtered = searchMatches(authentication, attributeNames, minRating, fromDate, toDate, text, mediaType, groupName);
 		int from = Math.min(page * pageSize, filtered.size());
 		int to = Math.min(from + pageSize, filtered.size());
 		List<ImageResponse> pageItems = filtered.subList(from, to).stream().map(ImageResponse::from).toList();
@@ -300,9 +307,16 @@ public class GalleryService {
 
 	/** A media type alone ("videos only") counts as a criterion too (15/10/2026). */
 	public static boolean hasSearchCriteria(List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate, String text, MediaType mediaType) {
+		return hasSearchCriteria(attributeNames, minRating, fromDate, toDate, text, mediaType, null);
+	}
+
+	/** So does a single group ("every picture of the family group", 31/10/2026). */
+	public static boolean hasSearchCriteria(List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate, String text, MediaType mediaType,
+			String groupName) {
 		boolean hasTags = attributeNames != null && !attributeNames.isEmpty();
 		boolean hasText = text != null && text.trim().length() >= MIN_TEXT_SEARCH_LENGTH;
-		return hasTags || hasText || minRating != null || fromDate != null || toDate != null || mediaType != null;
+		boolean hasGroup = groupName != null && !groupName.isBlank();
+		return hasTags || hasText || minRating != null || fromDate != null || toDate != null || mediaType != null || hasGroup;
 	}
 
 	/**
@@ -327,6 +341,20 @@ public class GalleryService {
 	@Transactional(readOnly = true)
 	public List<Image> searchMatches(Authentication authentication, List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate,
 			String text, MediaType mediaType) {
+		return searchMatches(authentication, attributeNames, minRating, fromDate, toDate, text, mediaType, null);
+	}
+
+	/**
+	 * {@code groupName} (31/10/2026, explicit ask - a "Group" criterion on the
+	 * desktop search screen): only pictures whose sequence belongs to that
+	 * group, ANDed like the media type. It narrows, never widens: the
+	 * caller's own readable groups still apply, so naming a group the caller
+	 * has no role in simply matches nothing.
+	 */
+	@Transactional(readOnly = true)
+	public List<Image> searchMatches(Authentication authentication, List<String> attributeNames, Integer minRating, LocalDate fromDate, LocalDate toDate,
+			String text, MediaType mediaType, String groupName) {
+		String group = (groupName == null || groupName.isBlank()) ? null : groupName.trim();
 		Set<String> readableGroups = authorizationService.readableGroupNames(authentication);
 		boolean hasTags = attributeNames != null && !attributeNames.isEmpty();
 		Set<Image> tagMatchedImages = null;
@@ -352,6 +380,7 @@ public class GalleryService {
 		// BETWEEN clause on a null column.
 		List<Image> filtered = imageRepository.findAll().stream()
 				.filter(img -> readableGroups == null || readableGroups.contains(img.getDirectory().getGroup().getGroupName()))
+				.filter(img -> group == null || group.equals(img.getDirectory().getGroup().getGroupName()))
 				.filter(img -> mediaType == null || img.getMediaType() == mediaType)
 				.filter(img -> minRating == null || img.getRating() >= minRating)
 				.filter(img -> fromDate == null || (img.getCaptureDate() != null && !img.getCaptureDate().toLocalDate().isBefore(fromDate)))

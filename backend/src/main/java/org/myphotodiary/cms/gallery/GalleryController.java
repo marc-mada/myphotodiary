@@ -103,13 +103,14 @@ public class GalleryController {
 			@RequestParam(required = false) LocalDate toDate,
 			@RequestParam(required = false) String text,
 			@RequestParam(required = false) String mediaType,
+			@RequestParam(required = false) String group,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(required = false) Integer pageSize) {
 		int effectivePageSize = pageSize != null ? pageSize : currentUserMaxQueryLength(authentication);
 		if (effectivePageSize < 1) {
 			throw new IllegalArgumentException("pageSize must be at least 1");
 		}
-		return galleryService.search(authentication, attribute, minRating, fromDate, toDate, text, parseMediaType(mediaType), page, effectivePageSize);
+		return galleryService.search(authentication, attribute, minRating, fromDate, toDate, text, parseMediaType(mediaType), group, page, effectivePageSize);
 	}
 
 	/** "IMAGE"/"VIDEO" (search's photos-only/videos-only filter), blank = both; anything else is a 400. */

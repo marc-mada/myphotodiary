@@ -38,7 +38,8 @@ export const MIN_TEXT_SEARCH_LENGTH = 4;
  * still counts - only `null`/`undefined` means "not set".
  */
 // `mediaType` ('IMAGE'/'VIDEO', 15/10/2026): photos or videos only - alone,
-// it is a criterion too (e.g. "every video").
-export function hasSearchCriteria({ attributeNames, minRating, fromDate, toDate, text, mediaType }) {
-	return (attributeNames?.length ?? 0) > 0 || minRating != null || !!fromDate || !!toDate || !!text || !!mediaType;
+// it is a criterion too (e.g. "every video"). Same for `group` (a group
+// name, 31/10/2026, desktop only so far).
+export function hasSearchCriteria({ attributeNames, minRating, fromDate, toDate, text, mediaType, group }) {
+	return (attributeNames?.length ?? 0) > 0 || minRating != null || !!fromDate || !!toDate || !!text || !!mediaType || !!group;
 }

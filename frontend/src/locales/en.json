@@ -134,7 +134,9 @@
     "mediaType": "Type",
     "mediaTypeAll": "All",
     "mediaTypeImage": "Photos",
-    "mediaTypeVideo": "Videos"
+    "mediaTypeVideo": "Videos",
+    "group": "Group",
+    "groupAll": "All groups"
   },
   "upload": {
     "sortAndCreateSequence": "Sort by date and create a new sequence",

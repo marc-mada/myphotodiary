@@ -107,6 +107,12 @@ export function SearchScreen({ onGoToDirectory }) {
 	const [toDate, setToDate] = useState('');
 	// Photos or videos only (15/10/2026) - '' for both, else 'IMAGE'/'VIDEO'.
 	const [mediaType, setMediaType] = useState('');
+	// One group's pictures only (31/10/2026, explicit ask) - '' for all the
+	// groups the user can browse, else a group name. `readableGroupNames`
+	// fills the dropdown: every group for an admin, otherwise the groups the
+	// user holds any role in (any role can browse, Role.isPermitted).
+	const [group, setGroup] = useState('');
+	const [readableGroupNames, setReadableGroupNames] = useState([]);
 	// Free-text filter (03/09/2026, explicit ask, revised same day) -
 	// matched against the tag/sequence-name/sequence-description/image-
 	// description disjunction - see GalleryService.search's own doc for the
@@ -178,12 +184,21 @@ export function SearchScreen({ onGoToDirectory }) {
 				if (me.primaryRoleName === 'ADMIN') {
 					groupApi
 						.list()
-						.then((groups) => setAssignableGroupNames(groups.map((g) => g.groupName)))
+						.then((groups) => {
+							const names = groups.map((g) => g.groupName);
+							setAssignableGroupNames(names);
+							setReadableGroupNames(names);
+						})
 						.catch(reportError);
-				} else if (me.primaryRoleName === 'WRITER') {
+				} else {
 					meApi
 						.groups()
-						.then((groups) => setAssignableGroupNames(groups.filter((g) => g.role === 'WRITER').map((g) => g.groupName)))
+						.then((groups) => {
+							if (me.primaryRoleName === 'WRITER') {
+								setAssignableGroupNames(groups.filter((g) => g.role === 'WRITER').map((g) => g.groupName));
+							}
+							setReadableGroupNames([...new Set(groups.map((g) => g.groupName))]);
+						})
 						.catch(reportError);
 				}
 			})
@@ -220,6 +235,7 @@ export function SearchScreen({ onGoToDirectory }) {
 					toDate: toDate || null,
 					text: debouncedText || null,
 				mediaType: mediaType || null,
+				group: group || null,
 					page: targetPage,
 				});
 				setImages((prev) => (targetPage === 0 ? result.images : [...prev, ...result.images]));
@@ -236,7 +252,7 @@ export function SearchScreen({ onGoToDirectory }) {
 				fetchingPageRef.current = null;
 			}
 		},
-		[selectedAttributes, minRating, fromDate, toDate, debouncedText, mediaType],
+		[selectedAttributes, minRating, fromDate, toDate, debouncedText, mediaType, group],
 	);
 
 	const hasCriteria = hasSearchCriteria({
@@ -245,7 +261,8 @@ export function SearchScreen({ onGoToDirectory }) {
 		fromDate: fromDate || null,
 		toDate: toDate || null,
 		text: debouncedText || null,
-				mediaType: mediaType || null,
+		mediaType: mediaType || null,
+		group: group || null,
 	});
 
 	// New filters -> start over from page 0. Skipped entirely while nothing
@@ -267,7 +284,7 @@ export function SearchScreen({ onGoToDirectory }) {
 		}
 		runSearch(0);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [selectedAttributes, minRating, fromDate, toDate, debouncedText, mediaType]);
+	}, [selectedAttributes, minRating, fromDate, toDate, debouncedText, mediaType, group]);
 
 	// Memoized so the filmstrip's IntersectionObserver effect (which depends
 	// on this identity) only actually resubscribes when `page` itself
@@ -324,6 +341,7 @@ export function SearchScreen({ onGoToDirectory }) {
 	// Alphabetical (03/09/2026, explicit ask) - allAttributes arrives in the
 	// backend's own tree-traversal order, not sorted by name.
 	const sortedAttributes = [...allAttributes].sort((a, b) => a.name.localeCompare(b.name));
+	const otherGroupNames = readableGroupNames.filter((name) => name !== 'public').sort((a, b) => a.localeCompare(b));
 
 	// Rename / Move (19/10/2026): the picture stays in the results (it still
 	// matches the same criteria, except for tags/comment inherited from its
@@ -379,6 +397,7 @@ export function SearchScreen({ onGoToDirectory }) {
 				toDate: toDate || null,
 				text: debouncedText || null,
 				mediaType: mediaType || null,
+				group: group || null,
 			});
 			await copyTextToClipboard(`${window.location.origin}/share/search/${shared.id}?token=${encodeURIComponent(shared.token)}`);
 			if (shared.truncated) {
@@ -525,6 +544,7 @@ export function SearchScreen({ onGoToDirectory }) {
 				toDate: toDate || null,
 				text: debouncedText || null,
 				mediaType: mediaType || null,
+				group: group || null,
 				page: currentPage,
 				pageSize: 100,
 			});
@@ -614,6 +634,20 @@ export function SearchScreen({ onGoToDirectory }) {
 							<option value="">{t('search.mediaTypeAll')}</option>
 							<option value="IMAGE">{t('search.mediaTypeImage')}</option>
 							<option value="VIDEO">{t('search.mediaTypeVideo')}</option>
+						</select>
+					</label>
+					<label className="search-group">
+						{t('search.group')}
+						<select value={group} onChange={(e) => setGroup(e.target.value)}>
+							<option value="">{t('search.groupAll')}</option>
+							{/* "public" always second (explicit ask), then the user's
+							    other groups alphabetically. */}
+							<option value="public">public</option>
+							{otherGroupNames.map((name) => (
+								<option key={name} value={name}>
+									{name}
+								</option>
+							))}
 						</select>
 					</label>
 

@@ -140,7 +140,7 @@ export const groupApi = {
  * logic; this is just the one extra query param that carries it.
  */
 export const searchApi = {
-	search: ({ attributeNames, minRating, fromDate, toDate, text, mediaType, page = 0, pageSize } = {}) => {
+	search: ({ attributeNames, minRating, fromDate, toDate, text, mediaType, group, page = 0, pageSize } = {}) => {
 		const params = new URLSearchParams();
 		(attributeNames ?? []).forEach((name) => params.append('attribute', name));
 		if (minRating != null) params.set('minRating', minRating);
@@ -148,6 +148,7 @@ export const searchApi = {
 		if (toDate) params.set('toDate', toDate);
 		if (text) params.set('text', text);
 		if (mediaType) params.set('mediaType', mediaType);
+		if (group) params.set('group', group);
 		params.set('page', page);
 		if (pageSize != null) params.set('pageSize', pageSize);
 		return apiFetch(`/api/images/search?${params.toString()}`);

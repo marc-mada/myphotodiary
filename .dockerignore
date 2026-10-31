@@ -5,3 +5,4 @@
 !docker/Caddyfile
 !docker/entrypoint.sh
 !backend/src/deb/scripts/
+!backend/src/deb/welcome/

@@ -41,6 +41,10 @@ RUN groupadd --system --gid 10001 myphotodiary \
 COPY backend/target/myphotodiary-backend-${VERSION}.jar /opt/myphotodiary/app.jar
 COPY frontend/dist/ /opt/myphotodiary/frontend/
 COPY docker/Caddyfile /etc/caddy/Caddyfile
+# Welcome photo, the same as the .deb package's - copied to /data/images by
+# entrypoint.sh on the very first start only.
+COPY backend/src/deb/welcome/ /opt/myphotodiary/welcome/
+RUN rm -f /opt/myphotodiary/welcome/README.md
 # Make everything shipped readable by the ordinary user, whatever the
 # permissions were on the build machine (some icons were owner-only, and
 # Caddy then answered 403 for them).

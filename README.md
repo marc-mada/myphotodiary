@@ -16,13 +16,38 @@ This self-hosted photo management platform lets you organize, preserve, and shar
   <img src="docs/images/desktop-gallery-after-install-half.png" alt="The myPhotoDiary Gallery, with its directory tree, picture viewer and film strip">
 </p>
 
+## Quick start (Docker Compose)
+
+On a Linux machine, NAS or Mac with Docker:
+
+```sh
+mkdir -p myphotodiary/data && cd myphotodiary
+curl -fsSL -o compose.yml \
+  https://raw.githubusercontent.com/marc-mada/myphotodiary/main/docker/compose.example.yml
+cat > .env <<EOF
+MPD_UID=$(id -u)
+MPD_GID=$(id -g)
+MPD_DATA=./data
+MPD_INITIAL_ADMIN_PASSWORD=choose-a-strong-one
+EOF
+docker compose up -d
+```
+
+Open <https://localhost>, accept the browser's certificate warning, and
+sign in as `admin` with the password above. To reach it from the
+Internet with a real certificate, add `MPD_DOMAIN=photos.example.com` to
+`.env` (ports 80 and 443 must be forwarded to this machine) and run
+`docker compose up -d` again. The
+[Installation Guide](docs/Installation%20Guide.md) (§6) covers the other
+settings, backups and the Debian packages.
+
 ## Everything you need to manage and share your memories
 
 Designed for families and small groups of friends, this self-hosted web application makes it easy to store, browse, organize, and share collections of photos and short videos.
 
 * **Organized collections** — Browse your media through a familiar directory structure, organized by year, month, and sequence (`year/month/sequence`).
 * **Find and rediscover memories** — Photos and videos are automatically indexed, making it easy to search your collection. Add comments, tags, and ratings to enrich and organize your memories.
-* **Share privately** — Share individual photos or entire sequences with anyone, even if they don't have an account, using external links that automatically expire after a configurable period.
+* **Share privately** — Share individual photos, entire sequences or search results with anyone, even if they don't have an account, using external links that automatically expire after 30 days.
 * **Desktop and mobile access** — Dedicated desktop and mobile interfaces share the same backend, with a responsive experience designed to work smoothly across different devices and network conditions.
 * **Manage your community** — An administration interface lets you manage users, groups, and roles, giving you control over who can access and share your collections.
 
@@ -37,6 +62,31 @@ Run it on your own Linux machine, NAS, or Mac — whether powered by Intel or AR
 ## Protect your memories with automatic backups
 
 The application can automatically back up its data every day, including photos, videos, and the database, to a NAS server.
+
+## How it compares
+
+There are excellent self-hosted photo platforms already, such as
+[Immich](https://immich.app), [PhotoPrism](https://www.photoprism.app)
+and [Piwigo](https://piwigo.org). myPhotoDiary is a smaller tool with a
+different focus:
+
+* **Your folders are the library.** Photos stay in plain
+  `year/month/sequence` folders on disk. Copying a folder in by hand and
+  re-indexing it is a normal way to add photos, and the library remains
+  readable without the app.
+* **Built for a family, not one person's phone backup.** Several users,
+  groups and roles decide who sees which sequences. Comments, tags and
+  ratings are shared, and links let people without an account see a
+  photo, a sequence or a search result for a limited time.
+* **Light to run.** One container (or two Debian packages) with an
+  embedded database and automatic HTTPS. No separate database server,
+  cache or machine-learning service.
+
+What it doesn't do: no face recognition or AI-powered search, no native
+mobile app, and no automatic backup of a phone's camera roll (the mobile
+web app can be installed on the home screen and receive photos from
+Android's share menu). If those matter most to you, one of the projects
+above is a better fit.
 
 ## Download
 
@@ -79,6 +129,27 @@ myPhotoDiary bundles third-party components under their own licenses —
 see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Release Notes
+
+### 2.16.0 — 2026-10-31
+
+- **Search by group**: a new **Group** filter on the Search screen,
+  desktop and mobile — all your groups, *public*, or one of your other
+  groups. It only narrows: you still never see pictures from groups you
+  don't belong to. Shared search results keep the chosen group.
+- **Mobile Search screen**: the two dates, then rating and type, now sit
+  side by side. Picking a Since date later than Till (or the reverse) no
+  longer produces a date in year 0001: the other date now follows.
+- **Welcome photo in Docker**: the Docker image now also puts the welcome
+  photo, `welcome.jpg`, in the Root folder, on the container's first start
+  only (no database yet). Restarts and image updates never bring it back,
+  and nothing is copied when the photo folder already holds files or
+  folders.
+- **Docker: several host names fixed**: with more than one name in
+  `MPD_LOCAL_HOSTNAMES` or `MPD_DOMAIN`, the container stopped right after
+  starting (Caddy rejected the address list).
+- **Docker: opening the app by IP address fixed**: `https://<IP address>`
+  failed with a TLS error, even when that address was listed in
+  `MPD_LOCAL_HOSTNAMES`. It now works for the first IP address listed.
 
 ### 2.15.0 — 2026-10-29
 

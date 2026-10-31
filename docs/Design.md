@@ -414,7 +414,7 @@ means "any authenticated role."
 | POST | `/api/directories/{id}/rename` | RBAC `EDIT_SEQUENCE` | Move files + cascade path change to descendants; target already a sequence → 409 `SEQUENCE_EXISTS` (counts, groups), or merge into it with `merge: true` (`EDIT_SEQUENCE` on both) |
 | GET | `/api/directories/{directoryId}/images` | any | List images in a directory |
 | POST | `/api/directories/{directoryId}/images` | RBAC `CREATE_SEQUENCE`/`EDIT_SEQUENCE` | Fixed-directory upload (vestigial — see §10) |
-| GET | `/api/images/search` | any | Paginated attribute+rating+date-range+free-text search; `mediaType=IMAGE\|VIDEO` (optional) ANDed like rating/dates, read from `image.media_type` |
+| GET | `/api/images/search` | any | Paginated attribute+rating+date-range+free-text search; `mediaType=IMAGE\|VIDEO` (optional) ANDed like rating/dates, read from `image.media_type`; `group=<name>` (optional) ANDed too, never widens the caller's readable groups |
 | PATCH | `/api/images/{imageId}` | RBAC `EDIT_IMAGE` | Edit description/rating/tags |
 | DELETE | `/api/images/{imageId}` | RBAC `DELETE_IMAGE` (ADMIN only — §7) | Delete an image |
 | GET | `/api/images/{imageId}/thumbnail` | any | 128px thumbnail bytes |
